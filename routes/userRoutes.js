@@ -9,12 +9,14 @@ const router = express.Router();
 router.post(
   "/register",
   upload.fields([
+    { name: "profilePicture", maxCount: 1 },
     { name: "citizenship", maxCount: 1 },
     { name: "pan", maxCount: 1 },
     { name: "drivingLicense", maxCount: 1 },
   ]),
   registerUser
 );
+
 // login route
 router.post("/login", loginUser);
 // protected route to get user info

@@ -1,27 +1,20 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import { sendResponse } from "../utils/responseHandler.js";
+import { saveCompressedImage } from "../utils/saveImage.js";
+import path from "path";
 
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, phone, address } = req.body;
 
-    // REQUIRED FIELD CHECK
     if (!name || !email || !password || !role || !phone || !address) {
-      return sendResponse(res, {
-        message: "All fields are required",
-        status: 400,
-      });
+      return sendResponse(res, { message: "All fields are required", status: 400 });
     }
 
-    // AT LEAST ONE DOCUMENT REQUIRED
     const docs = req.files || {};
-    if (
-      !docs.citizenship &&
-      !docs.pan &&
-      !docs.drivingLicense
-    ) {
+    if (!docs.citizenship && !docs.pan && !docs.drivingLicense) {
       return sendResponse(res, {
         message: "At least one document image is required",
         status: 400,
@@ -30,10 +23,26 @@ export const registerUser = async (req, res) => {
 
     const exists = await User.findOne({ email });
     if (exists) {
-      return sendResponse(res, {
-        message: "User email already exists",
-        status: 400,
-      });
+      return sendResponse(res, { message: "User email already exists", status: 400 });
+    }
+
+    const compressedDocs = {};
+
+    for (const key of ["citizenship", "pan", "drivingLicense", "profilePicture"]) {
+      if (docs[key]) {
+        const file = docs[key][0];
+
+        const folder =
+          key === "profilePicture" ? "uploads/profiles" : "uploads/documents";
+
+        const filename = `${Date.now()}-${key}.jpg`;
+
+        compressedDocs[key] = await saveCompressedImage(
+          file.buffer,
+          folder,
+          filename
+        );
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -46,10 +55,11 @@ export const registerUser = async (req, res) => {
       phone,
       address,
       documents: {
-        citizenship: docs.citizenship?.[0]?.path || null,
-        pan: docs.pan?.[0]?.path || null,
-        drivingLicense: docs.drivingLicense?.[0]?.path || null,
+        citizenship: compressedDocs.citizenship || null,
+        pan: compressedDocs.pan || null,
+        drivingLicense: compressedDocs.drivingLicense || null,
       },
+      profilePicture: compressedDocs.profilePicture || null,
     });
 
     req.session.userId = user._id;
