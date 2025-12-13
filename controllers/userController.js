@@ -1,9 +1,6 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+import { sendResponse } from "../utils/responseHandler.js";
 
 // REGISTER USER
 export const registerUser = async (req, res) => {
@@ -11,24 +8,21 @@ export const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
 
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "User already exists" });
+    if (exists) return sendResponse(res, { message: "User already exists", status: 400 });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword
-    });
+    const user = await User.create({ name, email, password: hashedPassword });
 
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: generateToken(user._id)
+    req.session.userId = user._id;
+
+    sendResponse(res, {
+      success: true,
+      message: "Registered and logged in successfully",
+      data: { _id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendResponse(res, { message: error.message, status: 500 });
   }
 };
 
@@ -38,18 +32,47 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid email" });
+    if (!user) return sendResponse(res, { message: "Invalid email", status: 400 });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ message: "Wrong password" });
+    if (!match) return sendResponse(res, { message: "Wrong password", status: 400 });
 
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: generateToken(user._id)
+    req.session.userId = user._id;
+
+    sendResponse(res, {
+      message: "Logged in successfully",
+      data: { _id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendResponse(res, { message: error.message, status: 500 });
   }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { message: "Not logged in", status: 401 });
+    }
+
+    const user = await User.findById(req.session.userId).select("-password");
+    if (!user) {
+      return sendResponse(res, { message: "User not found", status: 404 });
+    }
+
+    sendResponse(res, {
+      message: "Current user fetched successfully",
+      data: user,
+    });
+  } catch (error) {
+    sendResponse(res, { message: error.message, status: 500 });
+  }
+};
+
+// LOGOUT USER
+export const logoutUser = (req, res) => {
+  req.session.destroy(err => {
+    if (err) return sendResponse(res, { message: "Logout failed", status: 500 });
+    res.clearCookie("sid");
+    sendResponse(res, { success: true, message: "Logged out successfully" });
+  });
 };
