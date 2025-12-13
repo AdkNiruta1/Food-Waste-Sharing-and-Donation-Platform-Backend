@@ -1,18 +1,20 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
-import { sendResponse } from "../utils/responseHandler.js";
-import { saveCompressedImage } from "../utils/saveImage.js";
-import path from "path";
+import { sendResponse } from "../utils/responseHandler.js"; 
+import { saveCompressedImage } from "../utils/saveImage.js"; 
+import path from "path"; 
 
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, phone, address } = req.body;
 
+    // Check required fields
     if (!name || !email || !password || !role || !phone || !address) {
       return sendResponse(res, { message: "All fields are required", status: 400 });
     }
 
+    // Get uploaded files
     const docs = req.files || {};
     if (!docs.citizenship && !docs.pan && !docs.drivingLicense) {
       return sendResponse(res, {
@@ -21,6 +23,7 @@ export const registerUser = async (req, res) => {
       });
     }
 
+    // Check if email already exists
     const exists = await User.findOne({ email });
     if (exists) {
       return sendResponse(res, { message: "User email already exists", status: 400 });
@@ -28,25 +31,21 @@ export const registerUser = async (req, res) => {
 
     const compressedDocs = {};
 
+    // Compress & save uploaded files
     for (const key of ["citizenship", "pan", "drivingLicense", "profilePicture"]) {
       if (docs[key]) {
         const file = docs[key][0];
-
-        const folder =
-          key === "profilePicture" ? "uploads/profiles" : "uploads/documents";
-
+        const folder = key === "profilePicture" ? "uploads/profiles" : "uploads/documents";
         const filename = `${Date.now()}-${key}.jpg`;
 
-        compressedDocs[key] = await saveCompressedImage(
-          file.buffer,
-          folder,
-          filename
-        );
+        compressedDocs[key] = await saveCompressedImage(file.buffer, folder, filename);
       }
     }
 
+    // Hash password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create new user in database
     const user = await User.create({
       name,
       email,
@@ -62,8 +61,10 @@ export const registerUser = async (req, res) => {
       profilePicture: compressedDocs.profilePicture || null,
     });
 
+    // Set session
     req.session.userId = user._id;
 
+    // Send success response
     sendResponse(res, {
       message: "User registered successfully",
       data: {
@@ -80,29 +81,39 @@ export const registerUser = async (req, res) => {
   }
 };
 
-
 // LOGIN USER
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) return sendResponse(res, { message: "Invalid email", status: 400 });
 
+    // Compare password
     const match = await bcrypt.compare(password, user.password);
     if (!match) return sendResponse(res, { message: "Wrong password", status: 400 });
 
+    // Set session
     req.session.userId = user._id;
 
+    // Send success response
     sendResponse(res, {
       message: "Logged in successfully",
-      data: { _id: user._id, name: user.name, email: user.email, role: user.role, status: user.verified },
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.verified,
+      },
     });
   } catch (error) {
     sendResponse(res, { message: error.message, status: 500 });
   }
 };
 
+// GET CURRENT LOGGED-IN USER
 export const getMe = async (req, res) => {
   try {
     if (!req.session.userId) {
@@ -110,9 +121,7 @@ export const getMe = async (req, res) => {
     }
 
     const user = await User.findById(req.session.userId).select("-password");
-    if (!user) {
-      return sendResponse(res, { message: "User not found", status: 404 });
-    }
+    if (!user) return sendResponse(res, { message: "User not found", status: 404 });
 
     sendResponse(res, {
       message: "Current user fetched successfully",
@@ -127,7 +136,10 @@ export const getMe = async (req, res) => {
 export const logoutUser = (req, res) => {
   req.session.destroy(err => {
     if (err) return sendResponse(res, { message: "Logout failed", status: 500 });
+
+    // Clear session cookie
     res.clearCookie("sid");
+
     sendResponse(res, { success: true, message: "Logged out successfully" });
   });
 };

@@ -1,6 +1,7 @@
-export const sendResponse = (res, {message = "", data = null, status = 200 }) => {
+// custom utility to send standardized API responses
+export const sendResponse = (res, { message = "", data = null, status = 200 }) => {
   return res.status(status).json({
-    message,
-    data,
+    message, // Message describing the response
+    data,    // Optional data payload
   });
 };

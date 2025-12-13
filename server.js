@@ -19,7 +19,7 @@ mongoose
 // Parse JSON
 app.use(express.json());
 
-// ✅ CORS MUST BE HERE (BEFORE session & routes)
+// CORS MUST BE HERE (BEFORE session & routes)
 app.use(
   cors({
     origin: "http://localhost:5173",

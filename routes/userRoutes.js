@@ -4,8 +4,12 @@ import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
-// Multer setup for file uploads
-// signup route with document uploads
+
+// -------------------------
+// USER REGISTRATION ROUTE
+// -------------------------
+// Uses Multer to handle multiple file uploads (profile picture & documents)
+// Then calls registerUser controller
 router.post(
   "/register",
   upload.fields([
@@ -17,11 +21,17 @@ router.post(
   registerUser
 );
 
-// login route
+// -------------------------
+// USER LOGIN ROUTE
+// -------------------------
 router.post("/login", loginUser);
-// protected route to get user info
+
+// -------------------------
+// GET CURRENT USER INFO
+// -------------------------
+// Protected route; only accessible if authenticated
 router.get("/me", protect, (req, res) => {
-  res.json(req.user);
+  res.json(req.user); // req.user is set in protect middleware
 });
 
 export default router;
