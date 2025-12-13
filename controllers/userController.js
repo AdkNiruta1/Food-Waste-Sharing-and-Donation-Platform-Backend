@@ -5,26 +5,71 @@ import { sendResponse } from "../utils/responseHandler.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone, address } = req.body;
+
+    // REQUIRED FIELD CHECK
+    if (!name || !email || !password || !role || !phone || !address) {
+      return sendResponse(res, {
+        message: "All fields are required",
+        status: 400,
+      });
+    }
+
+    // AT LEAST ONE DOCUMENT REQUIRED
+    const docs = req.files || {};
+    if (
+      !docs.citizenship &&
+      !docs.pan &&
+      !docs.drivingLicense
+    ) {
+      return sendResponse(res, {
+        message: "At least one document image is required",
+        status: 400,
+      });
+    }
 
     const exists = await User.findOne({ email });
-    if (exists) return sendResponse(res, { message: "User already exists", status: 400 });
+    if (exists) {
+      return sendResponse(res, {
+        message: "User already exists",
+        status: 400,
+      });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({ name, email, password: hashedPassword, role });
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      phone,
+      address,
+      documents: {
+        citizenship: docs.citizenship?.[0]?.path || null,
+        pan: docs.pan?.[0]?.path || null,
+        drivingLicense: docs.drivingLicense?.[0]?.path || null,
+      },
+    });
 
     req.session.userId = user._id;
 
     sendResponse(res, {
-      success: true,
-      message: "Registered and logged in successfully",
-      data: { _id: user._id, name: user.name, email: user.email, role: user.role }
+      message: "User registered successfully",
+      data: {
+        id: user._id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        address: user.address,
+        role: user.role,
+      },
     });
   } catch (error) {
     sendResponse(res, { message: error.message, status: 500 });
   }
 };
+
 
 // LOGIN USER
 export const loginUser = async (req, res) => {
@@ -41,7 +86,7 @@ export const loginUser = async (req, res) => {
 
     sendResponse(res, {
       message: "Logged in successfully",
-      data: { _id: user._id, name: user.name, email: user.email }
+      data: { _id: user._id, name: user.name, email: user.email, role: user.role, status: user.verified },
     });
   } catch (error) {
     sendResponse(res, { message: error.message, status: 500 });

@@ -24,7 +24,6 @@ const UserSchema = new mongoose.Schema({
   address: {
     type: String,
     default: "",
-
   },
   role: {
     type: String,
@@ -39,7 +38,8 @@ const UserSchema = new mongoose.Schema({
   profilePicture: {
     type: String, default: null
   },
-  bio: { type: String, default: "" }
+  bio: { type: String, default: "" },
+  verified: { type: Boolean, default: false },
 }, {
   timestamps: true,
 });
