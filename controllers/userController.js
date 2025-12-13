@@ -5,21 +5,21 @@ import { sendResponse } from "../utils/responseHandler.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     const exists = await User.findOne({ email });
     if (exists) return sendResponse(res, { message: "User already exists", status: 400 });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({ name, email, password: hashedPassword });
+    const user = await User.create({ name, email, password: hashedPassword, role });
 
     req.session.userId = user._id;
 
     sendResponse(res, {
       success: true,
       message: "Registered and logged in successfully",
-      data: { _id: user._id, name: user.name, email: user.email }
+      data: { _id: user._id, name: user.name, email: user.email, role: user.role }
     });
   } catch (error) {
     sendResponse(res, { message: error.message, status: 500 });
