@@ -1,16 +1,27 @@
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+
+const ensureDir = (dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    let uploadPath = "uploads/documents";
+
     if (file.fieldname === "profilePicture") {
-      cb(null, "uploads/profiles");
-    } else {
-      cb(null, "uploads/documents");
+      uploadPath = "uploads/profiles";
     }
+
+    ensureDir(uploadPath); // 👈 auto create folder
+    cb(null, uploadPath);
   },
+
   filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     cb(null, unique + path.extname(file.originalname));
   },
 });
