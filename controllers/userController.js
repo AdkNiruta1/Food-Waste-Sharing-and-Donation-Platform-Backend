@@ -105,6 +105,7 @@ export const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        emailVerified: user.emailVerified,
         status: user.verified,
       },
     });
@@ -119,10 +120,10 @@ export const getMe = async (req, res) => {
     if (!req.session.userId) {
       return sendResponse(res, { message: "Not logged in", status: 401 });
     }
-
+// Fetch user from database
     const user = await User.findById(req.session.userId).select("-password");
     if (!user) return sendResponse(res, { message: "User not found", status: 404 });
-
+    // Send user data
     sendResponse(res, {
       message: "Current user fetched successfully",
       data: user,
@@ -134,12 +135,50 @@ export const getMe = async (req, res) => {
 
 // LOGOUT USER
 export const logoutUser = (req, res) => {
+  // Destroy session
   req.session.destroy(err => {
     if (err) return sendResponse(res, { message: "Logout failed", status: 500 });
 
     // Clear session cookie
     res.clearCookie("sid");
-
     sendResponse(res, { success: true, message: "Logged out successfully" });
   });
+};
+
+
+export const updatePassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return sendResponse(res, {
+        status: 400,
+        message: "Email and new password are required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return sendResponse(res, {
+        status: 404,
+        message: "User not found",
+      });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    await user.save();
+
+    return sendResponse(res, {
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: "Failed to reset password",
+    });
+  }
 };
