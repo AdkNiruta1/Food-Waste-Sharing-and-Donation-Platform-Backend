@@ -1,8 +1,10 @@
 import express from "express";
-import { registerUser, loginUser, logoutUser,getMe, updatePassword } from "../controllers/userController.js";
+import { registerUser, loginUser, logoutUser,getMe, resetPassword } from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { verifyOtp, sendOtp as resendOtp } from "../controllers/otpController.js";
+import { verifyOtp as forgetPasswordverifyOtp, sendOtp as forgetPasswordsendOtp } from "../controllers/forgetPasswordController.js";
+
 
 const router = express.Router();
 
@@ -37,11 +39,16 @@ router.get("/me", protect, getMe); // req.user is set in protect middleware
 // -------------------------
 router.post("/logout",protect,logoutUser);
 // OTP ROUTES
-router.post("/verify-otp", verifyOtp);
+router.post("/email/verify-otp", verifyOtp);
 // Resend OTP
-router.post("/send-otp", resendOtp);
+router.post("/email/send-otp", resendOtp);
+// FORGET PASSWORD ROUTES
+router.post("/forget-password/send-otp", forgetPasswordsendOtp);
+router.post("/forget-password/verify-otp", forgetPasswordverifyOtp);
+// UPDATE PASSWORD ROUTE  
 
-router.put("/update-password", protect, updatePassword);
+router.put("/reset-password", protect, resetPassword);
+
 
 
 export default router;

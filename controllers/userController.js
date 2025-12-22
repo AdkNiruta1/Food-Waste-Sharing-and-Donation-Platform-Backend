@@ -145,18 +145,18 @@ export const logoutUser = (req, res) => {
   });
 };
 
-
-export const updatePassword = async (req, res) => {
+// RESET PASSWORD
+export const resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-
+// Validate input
     if (!email || !newPassword) {
       return sendResponse(res, {
         status: 400,
         message: "Email and new password are required",
       });
     }
-
+// Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return sendResponse(res, {
@@ -168,9 +168,9 @@ export const updatePassword = async (req, res) => {
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
-
+// Save updated user
     await user.save();
-
+// Send success response
     return sendResponse(res, {
       success: true,
       message: "Password updated successfully",
