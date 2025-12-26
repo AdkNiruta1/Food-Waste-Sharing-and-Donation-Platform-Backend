@@ -33,6 +33,97 @@ export const verifyOtp = async (req, res) => {
   user.otpExpires = undefined;
   user.otpAttempts = 0;
   user.otpResendCount = 0;
+await sendEmail({
+  to: user.email,
+  subject: "Email Verified 🎉 | Welcome to Annapurna Bhandar",
+  html: `
+  <div style="
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    padding: 30px;
+  ">
+    <div style="
+      max-width: 600px;
+      margin: auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
+
+      <!-- Header -->
+      <div style="
+        background-color: #16a34a;
+        color: #ffffff;
+        padding: 20px;
+        text-align: center;
+      ">
+        <h1 style="margin: 0;">Annapurna Bhandar</h1>
+        <p style="margin: 5px 0 0;">Email Verification Successful</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 30px; color: #334155;">
+        <h2 style="color: #16a34a;">Welcome aboard 🎉</h2>
+
+        <p>Hello <strong>${user.name || "User"}</strong>,</p>
+
+        <p>
+          We're happy to let you know that your email address has been
+          <strong>successfully verified</strong>.
+        </p>
+
+        <p>
+          Your account has been created and is currently under review.
+          This process usually takes up to <strong>24 hours</strong>.
+        </p>
+
+        <p>
+          Once the verification is complete, we will notify you via this email.
+        </p>
+
+        <div style="
+          background-color: #f1f5f9;
+          border-left: 4px solid #16a34a;
+          padding: 15px;
+          margin: 25px 0;
+          border-radius: 6px;
+        ">
+          <p style="margin: 0;">
+            🚨 If you did not initiate this request, please ignore this email
+            or contact our support team immediately.
+          </p>
+        </div>
+
+        <p>
+          Thank you for joining <strong>Annapurna Bhandar</strong>.
+          We’re excited to have you with us!
+        </p>
+
+        <p>
+          Warm regards,<br />
+          <strong>Annapurna Bhandar Team</strong>
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        background-color: #f1f5f9;
+        padding: 15px;
+        text-align: center;
+        font-size: 13px;
+        color: #64748b;
+      ">
+        <p style="margin: 0;">
+          © ${new Date().getFullYear()} Annapurna Bhandar. All rights reserved.
+        </p>
+      </div>
+
+    </div>
+  </div>
+  `,
+});
+
 
   await user.save();
 // send success response
@@ -63,16 +154,109 @@ export const sendOtp = async (req, res) => {
 // save the user
   await user.save();
 // send the otp via email
-  await sendEmail({
-    to: user.email,
-    subject: "send OTP - Email Verification",
-    html: `
-      <h2>Email Verification</h2>
-      <p>Your OTP is:</p>
-      <h1>${otp}</h1>
-      <p>Valid for 1 minutes</p>
-    `,
-  });
+await sendEmail({
+  to: user.email,
+  subject: "Email Verification OTP 🔐 | Annapurna Bhandar",
+  html: `
+  <div style="
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    padding: 30px;
+  ">
+    <div style="
+      max-width: 600px;
+      margin: auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
+
+      <!-- Header -->
+      <div style="
+        background-color: #16a34a;
+        color: #ffffff;
+        padding: 20px;
+        text-align: center;
+      ">
+        <h1 style="margin: 0;">Annapurna Bhandar</h1>
+        <p style="margin: 6px 0 0;">Email Verification</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 30px; color: #334155;">
+        <h2 style="color: #16a34a;">Verify your email 🔐</h2>
+
+        <p>Hello <strong>${user.name || "User"}</strong>,</p>
+
+        <p>
+          Use the One-Time Password (OTP) below to verify your email address.
+        </p>
+
+        <!-- OTP Box -->
+        <div style="
+          margin: 25px 0;
+          text-align: center;
+        ">
+          <span style="
+            display: inline-block;
+            font-size: 32px;
+            letter-spacing: 6px;
+            font-weight: bold;
+            background-color: #f1f5f9;
+            padding: 14px 28px;
+            border-radius: 8px;
+            color: #16a34a;
+          ">
+            ${otp}
+          </span>
+        </div>
+
+        <p style="text-align: center;">
+          ⏳ This OTP is valid for <strong>1 minute</strong>.
+        </p>
+
+        <div style="
+          background-color: #fef2f2;
+          border-left: 4px solid #dc2626;
+          padding: 14px;
+          margin: 25px 0;
+          border-radius: 6px;
+        ">
+          <p style="margin: 0;">
+            🚨 Do not share this OTP with anyone.
+            Annapurna Bhandar will never ask for your OTP.
+          </p>
+        </div>
+
+        <p>
+          If you did not request this verification, please ignore this email.
+        </p>
+
+        <p>
+          Regards,<br />
+          <strong>Annapurna Bhandar Team</strong>
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        background-color: #f1f5f9;
+        padding: 15px;
+        text-align: center;
+        font-size: 13px;
+        color: #64748b;
+      ">
+        <p style="margin: 0;">
+          © ${new Date().getFullYear()} Annapurna Bhandar. All rights reserved.
+        </p>
+      </div>
+
+    </div>
+  </div>
+  `,
+});
+// send success response
 
   sendResponse(res, { message: "OTP sent successfully" });
 };

@@ -29,10 +29,95 @@ export const verifyOtp = async (req, res) => {
   user.otpExpires = undefined;
   user.otpAttempts = 0;
   user.otpResendCount = 0;
+  // send confirmation email
+await sendEmail({
+  to: user.email,
+  subject: "OTP Verified – Reset Your Password | Annapurna Bhandar",
+  html: `
+  <div style="
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    padding: 30px;
+  ">
+    <div style="
+      max-width: 600px;
+      margin: auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
+
+      <!-- Header -->
+      <div style="
+        background-color: #16a34a;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      ">
+        <h1 style="margin: 0;">Annapurna Bhandar</h1>
+        <p style="margin: 5px 0 0;">Password Reset Confirmation</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 30px; color: #334155;">
+        <h2 style="color: #16a34a;">OTP Verified Successfully 🎉</h2>
+
+        <p>
+          Hello <strong>${user.name || "User"}</strong>,
+        </p>
+
+        <p>
+          Your One-Time Password (OTP) has been successfully verified.
+          You can now safely proceed to reset your password.
+        </p>
+
+        <p>
+          For your security, please reset your password as soon as possible.
+        </p>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.CLIENT_URL}/reset-password"
+             style="
+              background-color: #16a34a;
+              color: #ffffff;
+              padding: 14px 28px;
+              border-radius: 6px;
+              text-decoration: none;
+              font-weight: bold;
+              display: inline-block;
+             ">
+            Reset Password
+          </a>
+        </div>
+
+        <p style="font-size: 14px; color: #64748b;">
+          If you did not request this password reset, please ignore this email
+          or contact our support team immediately.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        background-color: #f1f5f9;
+        padding: 15px;
+        text-align: center;
+        font-size: 13px;
+        color: #64748b;
+      ">
+        <p style="margin: 0;">
+          © ${new Date().getFullYear()} Annapurna Bhandar. All rights reserved.
+        </p>
+      </div>
+
+    </div>
+  </div>
+  `,
+});
 
   await user.save();
 // send success response
-  sendResponse(res, { message: "Email verified successfully" });
+  sendResponse(res, { message: "OTP verified successfully" });
 };
 // RESEND OTP
 
@@ -55,16 +140,95 @@ export const sendOtp = async (req, res) => {
 // save the user
   await user.save();
 // send the otp via email
-  await sendEmail({
-    to: user.email,
-    subject: "send OTP - Forget Password",
-    html: `
-      <h2>Forget Password</h2>
-      <p>Your OTP is:</p>
-      <h1>${otp}</h1>
-      <p>Valid for 1 minutes</p>
-    `,
-  });
+await sendEmail({
+  to: user.email,
+  subject: "Reset Password OTP | Annapurna Bhandar",
+  html: `
+  <div style="
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    padding: 30px;
+  ">
+    <div style="
+      max-width: 600px;
+      margin: auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
 
+      <!-- Header -->
+      <div style="
+        background-color: #16a34a;
+        color: #ffffff;
+        padding: 20px;
+        text-align: center;
+      ">
+        <h1 style="margin: 0;">Annapurna Bhandar</h1>
+        <p style="margin: 5px 0 0;">Password Reset Request</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 30px; color: #334155;">
+        <h2 style="color: #16a34a;">Forgot Your Password?</h2>
+
+        <p>Hello <strong>${user.name || "User"}</strong>,</p>
+
+        <p>
+          We received a request to reset your password.
+          Please use the OTP below to continue.
+        </p>
+
+        <div style="
+          background-color: #f1f5f9;
+          border: 1px dashed #16a34a;
+          padding: 20px;
+          text-align: center;
+          border-radius: 8px;
+          margin: 25px 0;
+        ">
+          <p style="margin: 0; font-size: 14px; color: #475569;">
+            Your One-Time Password (OTP)
+          </p>
+          <h1 style="
+            margin: 10px 0 0;
+            color: #16a34a;
+            letter-spacing: 6px;
+          ">
+            ${otp}
+          </h1>
+        </div>
+
+        <p>
+          ⏱️ This OTP is valid for <strong>1 minute</strong>.
+          Please do not share it with anyone.
+        </p>
+
+        <p style="font-size: 14px; color: #64748b;">
+          If you did not request this password reset,
+          please ignore this email or contact our support team.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        background-color: #f1f5f9;
+        padding: 15px;
+        text-align: center;
+        font-size: 13px;
+        color: #64748b;
+      ">
+        <p style="margin: 0;">
+          © ${new Date().getFullYear()} Annapurna Bhandar. All rights reserved.
+        </p>
+      </div>
+
+    </div>
+  </div>
+  `,
+});
+
+// send success response
   sendResponse(res, { message: "OTP sent successfully" });
 };
