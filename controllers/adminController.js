@@ -27,7 +27,7 @@ export const getAllUsers = async (req, res) => {
         { phone: { $regex: search, $options: "i" } },
       ];
     }
-
+    filter.role = { $ne: "admin" };
     const users = await User.find(filter)
       .select("-password")
       .skip(skip)

@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import activityLogRoutes from "./routes/activityLogRoutes.js";
+
 
 import mongoose from "mongoose";
 import cors from "cors";
@@ -54,6 +56,7 @@ app.use(
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/activity-logs", activityLogRoutes);
 
 // Server
 const PORT = process.env.PORT || 5000;
