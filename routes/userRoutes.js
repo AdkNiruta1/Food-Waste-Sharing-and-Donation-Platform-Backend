@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, logoutUser,getMe, resetPassword } from "../controllers/userController.js";
+import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments } from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { verifyOtp, sendOtp as resendOtp } from "../controllers/otpController.js";
@@ -48,6 +48,16 @@ router.post("/forget-password/verify-otp", forgetPasswordverifyOtp);
 // UPDATE PASSWORD ROUTE  
 
 router.put("/reset-password", protect, resetPassword);
+// RESUBMIT DOCUMENTS ROUTE
+router.post(
+  "/resubmit-documents/:token",
+  upload.fields([
+    { name: "citizenship" },
+    { name: "pan" },
+    { name: "drivingLicense" },
+  ]),
+  resubmitDocuments
+);
 
 
 

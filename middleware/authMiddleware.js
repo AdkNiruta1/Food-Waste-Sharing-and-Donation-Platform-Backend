@@ -17,3 +17,24 @@ export const protect = async (req, res, next) => {
   // Allow access to the next middleware or route handler
   next();
 };
+
+export const adminRoutes = async (req, res, next) => {
+  // Check if user is logged in via session
+  if (!req.session.userId) {
+    return sendResponse(res, {
+      status: 401,
+      message: "Unauthorized",
+    });
+  }
+// Fetch user from database
+  const user = await User.findById(req.session.userId);
+
+  if (!user || user.role !== "admin") {
+    return sendResponse(res, {
+      status: 403,
+      message: "Admin access only",
+    });
+  }
+
+  next();
+};

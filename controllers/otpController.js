@@ -2,7 +2,7 @@ import User from "../models/userModel.js";
 import { generateOTP, hashOTP, compareOTP } from "../utils/otpUtils.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendResponse } from "../utils/responseHandler.js";
-
+import { logActivity } from "../utils/logger.js";
 export const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 // check the exit email
@@ -126,6 +126,8 @@ await sendEmail({
 
 
   await user.save();
+  // Log activity
+  await logActivity("Email Verified", user._id, user._id);
 // send success response
   sendResponse(res, { message: "Email verified successfully" });
 };

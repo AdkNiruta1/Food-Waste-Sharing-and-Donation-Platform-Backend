@@ -2,7 +2,7 @@ import User from "../models/userModel.js";
 import { generateOTP, hashOTP, compareOTP } from "../utils/otpUtils.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendResponse } from "../utils/responseHandler.js";
-
+import { logActivity } from "../utils/logger.js";
 export const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 // check the exit email
@@ -76,21 +76,6 @@ await sendEmail({
           For your security, please reset your password as soon as possible.
         </p>
 
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.CLIENT_URL}/reset-password"
-             style="
-              background-color: #16a34a;
-              color: #ffffff;
-              padding: 14px 28px;
-              border-radius: 6px;
-              text-decoration: none;
-              font-weight: bold;
-              display: inline-block;
-             ">
-            Reset Password
-          </a>
-        </div>
-
         <p style="font-size: 14px; color: #64748b;">
           If you did not request this password reset, please ignore this email
           or contact our support team immediately.
@@ -116,6 +101,8 @@ await sendEmail({
 });
 
   await user.save();
+  // Log activity
+  await logActivity("OTP Verified", user._id, user._id);
 // send success response
   sendResponse(res, { message: "OTP verified successfully" });
 };

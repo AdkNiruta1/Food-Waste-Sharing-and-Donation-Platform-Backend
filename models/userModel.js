@@ -49,6 +49,9 @@ otpResendCount: {
   type: Number,
   default: 0,
 },
+// userModel.js
+resubmitToken: String,
+resubmitTokenExpires: Date,
   emailVerified: { type: Boolean, default: false },
   verified: { type: Boolean, default: false },
 }, {

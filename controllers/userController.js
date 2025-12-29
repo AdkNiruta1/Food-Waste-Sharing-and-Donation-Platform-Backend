@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import { sendResponse } from "../utils/responseHandler.js"; 
 import { saveCompressedImage } from "../utils/saveImage.js"; 
 import path from "path"; 
+import crypto from "crypto";
 
+import { logActivity } from "../utils/logger.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
@@ -61,8 +63,10 @@ export const registerUser = async (req, res) => {
       profilePicture: compressedDocs.profilePicture || null,
     });
 
-    // Set session
-    req.session.userId = user._id;
+    // Log activity and create notification
+        await logActivity("User Registered", user._id, user._id, {
+      role: user.role,
+    });
 
     // Send success response
     sendResponse(res, {
@@ -96,6 +100,11 @@ export const loginUser = async (req, res) => {
 
     // Set session
     req.session.userId = user._id;
+    // ✅ Log login
+    await logActivity("User Logged In", user._id, user._id, {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
 
     // Send success response
     sendResponse(res, {
@@ -134,11 +143,14 @@ export const getMe = async (req, res) => {
 };
 
 // LOGOUT USER
-export const logoutUser = (req, res) => {
+export const logoutUser = async (req, res) => {
+  const userId = req.session.userId;
   // Destroy session
-  req.session.destroy(err => {
+  req.session.destroy(async err => {
     if (err) return sendResponse(res, { message: "Logout failed", status: 500 });
-
+    if (userId) {
+          await logActivity("User Logged Out", userId, userId);
+    }
     // Clear session cookie
     res.clearCookie("sid");
     sendResponse(res, { success: true, message: "Logged out successfully" });
@@ -170,6 +182,14 @@ export const resetPassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, salt);
 // Save updated user
     await user.save();
+    // Log activity
+        await logActivity(
+      "Password Reset",
+      req.session.userId || user._id,
+      user._id
+    );
+
+
 // Send success response
     return sendResponse(res, {
       success: true,
@@ -179,6 +199,54 @@ export const resetPassword = async (req, res) => {
     return sendResponse(res, {
       status: 500,
       message: "Failed to reset password",
+    });
+  }
+};
+
+// RESUBMIT DOCUMENTS
+export const resubmitDocuments = async (req, res) => {
+  // Hash the resubmit token from params
+  try {
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+// Find user by resubmit token
+    const user = await User.findOne({
+      resubmitToken: hashedToken,
+      resubmitTokenExpires: { $gt: Date.now() },
+    });
+// If no user found, token is invalid or expired
+    if (!user) {
+      return sendResponse(res, {
+        status: 400,
+        message: "Invalid or expired resubmission link",
+      });
+    }
+
+    // Save new documents
+    user.documents.citizenship = req.files.citizenship?.[0]?.path || user.documents.citizenship;
+    user.documents.pan = req.files.pan?.[0]?.path || user.documents.pan;
+    user.documents.drivingLicense = req.files.drivingLicense?.[0]?.path || user.documents.drivingLicense;
+
+    // Reset verification flags
+    user.verified = false;
+    user.rejected = false;
+    user.resubmitToken = undefined;
+    user.resubmitTokenExpires = undefined;
+
+    await user.save();
+
+    await logActivity("Documents Resubmitted", user._id, user._id);
+
+    return sendResponse(res, {
+      success: true,
+      message: "Documents resubmitted successfully. Await admin verification.",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
     });
   }
 };
