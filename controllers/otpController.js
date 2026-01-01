@@ -9,7 +9,7 @@ export const verifyOtp = async (req, res) => {
   const user = await User.findOne({ email });
   if (!user) return sendResponse(res, { message: "User not found", status: 404 });
 // check the email is verified
-  if (user.emailVerified) {
+  if (user.emailVerified==="verified") {
     return sendResponse(res, { message: "Email already verified" });
   }
 // check the otp expiration
@@ -28,7 +28,7 @@ export const verifyOtp = async (req, res) => {
     return sendResponse(res, { message: "Invalid OTP", status: 400 });
   }
 // mark email as verified
-  user.emailVerified = true;
+  user.emailVerified = "verified";
   user.otp = undefined;
   user.otpExpires = undefined;
   user.otpAttempts = 0;
@@ -139,7 +139,7 @@ export const sendOtp = async (req, res) => {
   const user = await User.findOne({ email });
   if (!user) return sendResponse(res, { message: "User not found", status: 404 });
 // check the exit email
-  if (user.emailVerified) {
+  if (user.emailVerified==="verified") {
     return sendResponse(res, { message: "Email already verified" });
   }
 // limit the resend otp

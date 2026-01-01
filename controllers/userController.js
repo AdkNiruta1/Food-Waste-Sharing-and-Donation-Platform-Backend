@@ -115,7 +115,7 @@ export const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         emailVerified: user.emailVerified,
-        status: user.verified,
+        status: user.accountVerified,
       },
     });
   } catch (error) {
@@ -230,8 +230,7 @@ export const resubmitDocuments = async (req, res) => {
     user.documents.drivingLicense = req.files.drivingLicense?.[0]?.path || user.documents.drivingLicense;
 
     // Reset verification flags
-    user.verified = false;
-    user.rejected = false;
+    user.accountVerified = "pending";
     user.resubmitToken = undefined;
     user.resubmitTokenExpires = undefined;
 

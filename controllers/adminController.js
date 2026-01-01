@@ -96,7 +96,7 @@ export const verifyUser = async (req, res) => {
       });
     }
 // Update user verification status
-  user.verified = true;
+  user.accountVerified = "verified";
   await user.save();
   await logActivity("User Verified", req.session.userId, user._id);
   await createNotification(user._id, "Your account has been verified by admin");
@@ -212,9 +212,7 @@ export const rejectUser = async (req, res) => {
     }
 
 // Update user verification status
-    user.verified = false;
-    user.rejected = true;
-
+    user.accountVerified = "rejected";
     const token = crypto.randomBytes(32).toString("hex");
 
     user.resubmitToken = crypto.createHash("sha256").update(token).digest("hex");
