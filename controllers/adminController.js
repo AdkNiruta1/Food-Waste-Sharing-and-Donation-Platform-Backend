@@ -4,6 +4,7 @@ import { getPagination } from "../utils/pagination.js";
 import { logActivity } from "../utils/logger.js";
 import { createNotification } from "./notificationController.js";
 import { Parser } from "json2csv";
+import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto";
 
 // ADMIN CONTROLLER FUNCTIONS
@@ -213,8 +214,8 @@ export const rejectUser = async (req, res) => {
 
 // Update user verification status
     user.accountVerified = "rejected";
+    user.rejectionReason = req.body.reason || "Not specified";
     const token = crypto.randomBytes(32).toString("hex");
-
     user.resubmitToken = crypto.createHash("sha256").update(token).digest("hex");
     user.resubmitTokenExpires = Date.now() + 1000 * 60 * 60 * 24; // 24 hours
     await user.save();

@@ -49,7 +49,7 @@ router.post("/forget-password/verify-otp", forgetPasswordverifyOtp);
 
 router.put("/reset-password", protect, resetPassword);
 // RESUBMIT DOCUMENTS ROUTE
-router.post(
+router.put(
   "/resubmit-documents/:token",
   upload.fields([
     { name: "citizenship" },

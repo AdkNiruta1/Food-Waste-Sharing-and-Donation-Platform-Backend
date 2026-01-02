@@ -51,8 +51,9 @@ otpResendCount: {
 },
 resubmitToken: String,
 resubmitTokenExpires: Date,
-  emailVerified: { type: String, enum: ["pending", "verified"], default: "pending" },
-  accountVerified: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+emailVerified: { type: String, enum: ["pending", "verified"], default: "pending" },
+accountVerified: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+rejectionReason: { type: String, default: "" },
 }, {
   timestamps: true,
 });
