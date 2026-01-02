@@ -1,4 +1,5 @@
 import User from "../models/userModel.js";
+import { sendResponse } from "../utils/responseHandler.js";
 export const protect = async (req, res, next) => {
   // Check if user is logged in via session
   if (!req.session.userId) {

@@ -4,12 +4,12 @@ import {
   getMyLogs,
   getUserLogs,
 } from "../controllers/logController.js";
-import { adminRoutes as isAdmin } from "../middleware/authMiddleware.js";
+import { adminRoutes as isAdmin, protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // Logged-in user
-router.get("/my", getMyLogs);
+router.get("/my", protect, getMyLogs);
 
 // Admin
 router.get("/", isAdmin, getLogs);

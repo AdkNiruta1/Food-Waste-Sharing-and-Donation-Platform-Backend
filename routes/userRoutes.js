@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments } from "../controllers/userController.js";
+import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments, updateMyProfile,updatePhoto } from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { verifyOtp, sendOtp as resendOtp } from "../controllers/otpController.js";
@@ -47,7 +47,7 @@ router.post("/forget-password/send-otp", forgetPasswordsendOtp);
 router.post("/forget-password/verify-otp", forgetPasswordverifyOtp);
 // UPDATE PASSWORD ROUTE  
 
-router.put("/reset-password", protect, resetPassword);
+router.put("/reset-password", resetPassword);
 // RESUBMIT DOCUMENTS ROUTE
 router.put(
   "/resubmit-documents/:token",
@@ -58,6 +58,9 @@ router.put(
   ]),
   resubmitDocuments
 );
+
+router.put("/update-profile", protect, updateMyProfile);
+router.put("/update-photo", upload.fields([{ name: "profilePicture" }]), updatePhoto);
 
 
 

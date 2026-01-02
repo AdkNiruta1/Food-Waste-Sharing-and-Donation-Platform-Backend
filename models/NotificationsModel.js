@@ -4,7 +4,7 @@ const notificationSchema = new mongoose.Schema({
   message: String,
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: "Users",
   },
   read: {
     type: Boolean,

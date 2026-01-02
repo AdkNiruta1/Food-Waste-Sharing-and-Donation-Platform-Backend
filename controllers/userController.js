@@ -193,7 +193,6 @@ export const resetPassword = async (req, res) => {
 
     // Send success response
     return sendResponse(res, {
-      success: true,
       message: "Password updated successfully",
     });
   } catch (error) {
@@ -319,13 +318,83 @@ export const resubmitDocuments = async (req, res) => {
       `,
     });
     return sendResponse(res, {
-      success: true,
       message: "Documents resubmitted successfully. Await admin verification.",
     });
   } catch (error) {
     return sendResponse(res, {
       status: 500,
       message: error.message,
+    });
+  }
+};
+
+export const updatePhoto = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+    const docs = req.files || {};
+    if (!docs.profilePicture) {
+      return sendResponse(res, { status: 400, message: "No file uploaded" });
+    }
+
+    const file = docs.profilePicture[0];
+    const folder = "uploads/profiles";
+    const filename = `${Date.now()}-profile.jpg`;
+
+    const savedPath = await saveCompressedImage(file.buffer, folder, filename);
+    user.profilePicture = savedPath.replace(/\\/g, "/");
+
+    await user.save();
+    return sendResponse(res, { status: 200, message: "Photo updated successfully", data: user.profilePicture });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
+
+// Vupdate profile
+export const updateMyProfile = async (req, res) => {
+  try {
+    // Check if user is logged in
+    if (!req.session?.userId) {
+      return res.status(401).json({ status: 500, message: "Not logged in" });
+    }
+
+    const userId = req.session.userId;
+
+    // Allowed fields to update
+    const allowedFields = ["name", "phone", "address", "bio"];
+
+    const updateData = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ status: 500, message: "No valid fields to update" });
+    }
+
+    const updatedUser = await UsersModel.findByIdAndUpdate(userId, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: 500,
+      message: error.message || "Server error",
     });
   }
 };

@@ -1,6 +1,5 @@
 // Import ActivityLog model to interact with activity_logs collection
 import ActivityLog from "../models/ActivityLogModel.js";
-
 // Standard response helper
 import { sendResponse } from "../utils/responseHandler.js";
 

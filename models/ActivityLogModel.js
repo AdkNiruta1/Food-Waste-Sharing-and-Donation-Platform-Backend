@@ -9,12 +9,12 @@ const activityLogSchema = new mongoose.Schema(
     },
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Users",
       required: true,
     },
     targetUser: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Users",
     },
     metadata: {
       type: Object, // optional extra info (IP, role, etc.)
