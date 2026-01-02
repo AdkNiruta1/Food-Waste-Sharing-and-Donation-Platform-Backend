@@ -79,3 +79,30 @@ export const markNotificationRead = async (req, res) => {
     });
   }
 };
+
+export const deleteNotification = async (req, res) => {
+  try {
+    // Ensure user is logged in
+    const notification = await Notification.findOneAndDelete({
+      _id: req.params.id,
+      user: req.session.userId,
+    });
+// Check if notification exists
+    if (!notification) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Notification not found",
+      });
+    }
+// Send response
+    return sendResponse(res, {
+      success: true,
+      message: "Notification deleted successfully",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
