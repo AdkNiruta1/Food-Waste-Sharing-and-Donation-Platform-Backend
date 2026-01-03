@@ -6,13 +6,18 @@ import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import activityLogRoutes from "./routes/activityLogRoutes.js";
+import foodDonationRoutes from "./routes/foodDonationRoutes.js";
+import ratingRoutes from "./routes/ratingRoutes.js"
 import path from "path";
 import mongoose from "mongoose";
 import cors from "cors";
+import http from "http";
+import { setupLiveLocationSocket } from "./controllers/liveLocationSocket.js";
 
 dotenv.config();
-
 const app = express();
+const server = http.createServer(app);
+setupLiveLocationSocket(server);
 
 // Connect to MongoDB
 mongoose
@@ -56,6 +61,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/activity-logs", activityLogRoutes);
+app.use("/api/food-donations", foodDonationRoutes)
+app.use("/api/ratings", ratingRoutes)
+
 
 // Server
 const PORT = process.env.PORT || 5000;

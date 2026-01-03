@@ -4,7 +4,9 @@ import { getPagination } from "../utils/pagination.js";
 export const createNotification = async (userId, message) => {
   await Notification.create({ user: userId, message });
 };
-
+export const sendNotificationAll = async (message) => {
+  await Notification.create({ message });
+}
 // GET /api/notifications/my
 // Get my notifications
 export const getMyNotifications = async (req, res) => {
@@ -24,11 +26,15 @@ export const getMyNotifications = async (req, res) => {
 
     // Fetch notifications for the logged-in user
     const notifications = await Notification.find({
-      user: req.session.userId,
+      $or: [
+        { user: req.session.userId }, // personal notifications
+        { user: { $exists: false } }  // global notifications
+      ]
     })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+
 
     // Count total notifications for pagination
     const total = await Notification.countDocuments({
@@ -62,19 +68,18 @@ export const markNotificationRead = async (req, res) => {
     // Ensure user is logged in
     const notification = await Notification.findOne({
       _id: req.params.id,
-      user: req.session.userId,
     });
-// Check if notification exists
+    // Check if notification exists
     if (!notification) {
       return sendResponse(res, {
         status: 404,
         message: "Notification not found",
       });
     }
-// Mark as read
+    // Mark as read
     notification.read = true;
     await notification.save();
-// Send response
+    // Send response
     return sendResponse(res, {
 
       message: "Notification marked as read",
@@ -94,7 +99,7 @@ export const markAllNotificationsRead = async (req, res) => {
       { user: req.session.userId, read: false },
       { read: true }
     );
-// Send response
+    // Send response
     return sendResponse(res, {
       message: "All notifications marked as read",
     });
@@ -111,16 +116,15 @@ export const deleteNotification = async (req, res) => {
     // Ensure user is logged in
     const notification = await Notification.findOneAndDelete({
       _id: req.params.id,
-      user: req.session.userId,
     });
-// Check if notification exists
+    // Check if notification exists
     if (!notification) {
       return sendResponse(res, {
         status: 404,
         message: "Notification not found",
       });
     }
-// Send response
+    // Send response
     return sendResponse(res, {
       message: "Notification deleted successfully",
     });

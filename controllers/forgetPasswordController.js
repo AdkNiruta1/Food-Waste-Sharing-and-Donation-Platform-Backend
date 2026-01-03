@@ -102,6 +102,7 @@ await sendEmail({
 
   await user.save();
   // Log activity
+  
   await logActivity("OTP Verified", user._id, user._id);
 // send success response
   sendResponse(res, { message: "OTP verified successfully" });

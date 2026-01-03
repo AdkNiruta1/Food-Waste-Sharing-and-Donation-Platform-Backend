@@ -7,6 +7,7 @@ import crypto from "crypto";
 
 import { logActivity } from "../utils/logger.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { createNotification } from "./notificationController.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
@@ -184,6 +185,7 @@ export const resetPassword = async (req, res) => {
     // Save updated user
     await user.save();
     // Log activity
+    await createNotification(user._id, "someone is trying to reset your password");
     await logActivity(
       "Password Reset",
       req.session.userId || user._id,
@@ -348,7 +350,7 @@ export const updatePhoto = async (req, res) => {
 
     const savedPath = await saveCompressedImage(file.buffer, folder, filename);
     user.profilePicture = savedPath.replace(/\\/g, "/");
-
+    await logActivity("Photo Updated", user._id, user._id);
     await user.save();
     return sendResponse(res, { status: 200, message: "Photo updated successfully", data: user.profilePicture });
   } catch (error) {
@@ -381,10 +383,11 @@ export const updateMyProfile = async (req, res) => {
       return res.status(400).json({ status: 500, message: "No valid fields to update" });
     }
 
-    const updatedUser = await UsersModel.findByIdAndUpdate(userId, updateData, {
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
       new: true,
       runValidators: true,
     });
+    await logActivity("Profile updated", req.session.userId);
 
     return res.status(200).json({
       message: "Profile updated successfully",
