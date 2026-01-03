@@ -118,6 +118,34 @@ export const getMyDonations = async (req, res) => {
   }
 };
 
+export const getMyActiveDonations = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
+    }
+
+    const donations = await FoodPost.find({
+      donor: req.session.userId,
+      status: "available", 
+    })
+      .sort({ createdAt: -1 });
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Active donations fetched successfully",
+      data: donations,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
 //reciver request food
 export const requestFood = async (req, res) => {
   try {

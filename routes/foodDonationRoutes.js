@@ -8,7 +8,8 @@ import {
   rejectedFoodRequest,
   getFoodLocations,
   requestFood,
-  getFoodById
+  getFoodById,
+  getMyActiveDonations
 } from "../controllers/foodDonationsController.js";
 import { upload } from "../middleware/upload.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -16,7 +17,9 @@ const router = express.Router();
 // Routes
 router.post("/",protect, upload.fields([{ name: "photo" }]), createFoodDonation);
 router.get("/", getAllFoodDonations);
-router.get("/my",protect, getMyDonations);
+router.get("/history",protect, getMyDonations);
+router.get("/my",protect, getMyActiveDonations);
+
 router.post("/request",protect, requestFood);
 router.post("/accept",protect, acceptFoodRequest);
 router.post("/complete",protect, completeFoodRequest);
