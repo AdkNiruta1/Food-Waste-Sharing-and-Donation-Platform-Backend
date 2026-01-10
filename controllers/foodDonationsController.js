@@ -106,7 +106,7 @@ export const getAllFoodDonations = async (req, res) => {
 };
 
 
-// Get donations by donor
+// Get donations by donor with status completed
 export const getMyDonationsHistory = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
@@ -117,6 +117,7 @@ export const getMyDonationsHistory = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
+// Get donations by donor with status accepted
 export const getMyActiveDonations = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
@@ -127,7 +128,7 @@ export const getMyActiveDonations = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
-
+// Get donations by donor
 export const getMyDonations = async (req, res) => {
   try {
     if (!req.session.userId) {
@@ -145,7 +146,7 @@ export const getMyDonations = async (req, res) => {
 
     return sendResponse(res, {
       status: 200,
-      message: "Active donations fetched successfully",
+      message: "Food donations fetched successfully",
       data: donations,
     });
   } catch (error) {
@@ -276,7 +277,8 @@ export const getFoodLocations = async (req, res) => {
 export const getFoodById = async (req, res) => {
   try {
     const food = await FoodPost.findById(req.params.id)
-      .populate("donor");
+      .populate("donor")
+      .lean(); // 👈 required so we can attach extra data
 
     if (!food) {
       return sendResponse(res, {
@@ -285,7 +287,18 @@ export const getFoodById = async (req, res) => {
       });
     }
 
+    // 🔥 Fetch all requests for this food
+    const requests = await FoodRequest.find({
+      foodPost: food._id,
+    })
+      .populate("receiver")
+      .sort({ createdAt: -1 });
+
+    // Attach requests to food
+    food.requests = requests;
+
     return sendResponse(res, {
+      status: 200,
       data: food,
     });
   } catch (error) {
