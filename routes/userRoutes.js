@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments, updateMyProfile,updatePhoto } from "../controllers/userController.js";
+import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments, updateMyProfile,updatePhoto, changePassword,requestEmailChange,verifyEmailChangeOTP} from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { verifyOtp, sendOtp as resendOtp } from "../controllers/otpController.js";
@@ -61,6 +61,9 @@ router.put(
 
 router.put("/update-profile", protect, updateMyProfile);
 router.put("/update-photo", upload.fields([{ name: "profilePicture" }]), updatePhoto);
+router.put("/update-password",protect, changePassword);
+router.post("/request-email-change",protect, requestEmailChange);
+router.post("/verify-email-otp",protect, verifyEmailChangeOTP);
 
 
 

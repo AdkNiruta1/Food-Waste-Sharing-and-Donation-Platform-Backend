@@ -40,20 +40,20 @@ const UserSchema = new mongoose.Schema({
   },
   bio: { type: String, default: "" },
   otp: String,
-otpExpires: Date,
-otpAttempts: {
-  type: Number,
-  default: 0,
-},
-otpResendCount: {
-  type: Number,
-  default: 0,
-},
-resubmitToken: String,
-resubmitTokenExpires: Date,
-emailVerified: { type: String, enum: ["pending", "verified"], default: "pending" },
-accountVerified: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
-rejectionReason: { type: String, default: "" },
+  otpExpires: Date,
+  otpAttempts: {
+    type: Number,
+    default: 0,
+  },
+  otpResendCount: {
+    type: Number,
+    default: 0,
+  },
+  resubmitToken: String,
+  resubmitTokenExpires: Date,
+  emailVerified: { type: String, enum: ["pending", "verified"], default: "pending" },
+  accountVerified: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+  rejectionReason: { type: String, default: "" },
 }, {
   timestamps: true,
 });

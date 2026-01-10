@@ -107,18 +107,28 @@ export const getAllFoodDonations = async (req, res) => {
 
 
 // Get donations by donor
-export const getMyDonations = async (req, res) => {
+export const getMyDonationsHistory = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
 
-    const donations = await FoodPost.find({ donor: req.session.userId });
+    const donations = await FoodPost.find({ donor: req.session.userId, status:"completed" });
+    return sendResponse(res, { status: 200, data: donations });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+export const getMyActiveDonations = async (req, res) => {
+  try {
+    if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
+
+    const donations = await FoodPost.find({ donor: req.session.userId, status:"accepted" });
     return sendResponse(res, { status: 200, data: donations });
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
 
-export const getMyActiveDonations = async (req, res) => {
+export const getMyDonations = async (req, res) => {
   try {
     if (!req.session.userId) {
       return sendResponse(res, {
@@ -284,4 +294,56 @@ export const getFoodById = async (req, res) => {
       message: error.message,
     });
   }
+};
+
+export const deleteFoodDonation = async (req, res) => {
+  try {
+    const foodId = req.params.id;
+    const foodPost = await FoodPost.findById(foodId);
+    if (!foodPost) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Food donation not found",
+      });
+    }
+    await FoodPost.findByIdAndDelete(foodId);
+    await logActivity("Food Donation Deleted", req.session.userId);
+    return sendResponse(res, {
+      message: "Food donation deleted successfully",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const updateFoodDonation = async (req, res) => {
+  try {
+    const foodId = req.params.id;
+    const foodPost = await FoodPost.findById(foodId);
+    if (!foodPost) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Food donation not found",
+      });
+    }
+
+    const updatedFoodPost = await FoodPost.findByIdAndUpdate(
+      foodId,
+      req.body,
+      { new: true }
+    );
+    await logActivity("Food Donation Updated", req.session.userId);
+    return sendResponse(res, {
+      message: "Food donation updated successfully",
+      data: updatedFoodPost,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }  
 };

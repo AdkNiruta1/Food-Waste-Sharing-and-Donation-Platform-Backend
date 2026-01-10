@@ -401,3 +401,110 @@ export const updateMyProfile = async (req, res) => {
     });
   }
 };
+
+export const changePassword = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+    const { oldPassword, newPassword } = req.body;
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if(oldPassword===newPassword){
+      return sendResponse(res, { status: 400, message: "New password cannot be same as old password" });
+    }
+    if (!isMatch) return sendResponse(res, { status: 400, message: "Old password is incorrect" });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await logActivity("Password changed", user._id, user._id);
+    await user.save();
+    return sendResponse(res, { status: 200, message: "Password changed successfully" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
+
+export const requestEmailChange = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+
+    const { email } = req.body;
+    if (email == user.email) return sendResponse(res, { status: 400, message: "New email is same as current email" });
+    //email already exists
+    const existingUser = await User.findOne({ email: email });
+    if (existingUser) return sendResponse(res, { status: 400, message: "Email already exists" });
+    if (!email) return sendResponse(res, { status: 400, message: "Email is required" });
+
+    // Generate OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    // Save OTP in user record with expiration (5 mins)
+    user.otp = otp;
+    user.otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
+    await user.save();
+
+    // Send OTP via email
+    await sendEmail({
+      to: email,
+      subject: "Email Change OTP",
+      html: `
+    <div style="font-family: Arial, sans-serif;">
+      <h2>Email Change Verification</h2>
+      <p>Your OTP to change your email is:</p>
+      <h1 style="letter-spacing: 4px;">${otp}</h1>
+      <p>This OTP will expire in 5 minutes.</p>
+    </div>
+  `,
+    });
+
+
+    await logActivity("Requested email change", user._id, user._id);
+    return sendResponse(res, { status: 200, message: "OTP sent to new email" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+export const verifyEmailChangeOTP = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    const { otp, email } = req.body;
+    if (!otp) return sendResponse(res, { status: 400, message: "OTP is required" });
+
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+    // Check OTP validity
+    if (
+      user.otp !== otp ||
+      Date.now() > user.otpExpires
+    ) {
+      return sendResponse(res, { status: 400, message: "Invalid or expired OTP" });
+    }
+
+    // Update email
+    user.email = email;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    await logActivity("Email changed", user._id, user._id);
+
+    return sendResponse(res, { status: 200, message: "Email changed successfully" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};

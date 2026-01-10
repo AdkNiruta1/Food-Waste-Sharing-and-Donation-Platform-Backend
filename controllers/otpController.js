@@ -148,13 +148,9 @@ export const sendOtp = async (req, res) => {
   }
 // generate new otp
   const otp = generateOTP();
-// hash the otp
   user.otp = await hashOTP(otp);
   user.otpExpires = Date.now() + 1 * 60 * 1000;
-  user.otpAttempts = 0;
-  user.otpResendCount += 1;
-// save the user
-  await user.save();
+
 // send the otp via email
 await sendEmail({
   to: user.email,
@@ -259,6 +255,9 @@ await sendEmail({
   `,
 });
 // send success response
-
+  user.otpAttempts = 0;
+  user.otpResendCount += 1;
+// save the user
+  await user.save();
   sendResponse(res, { message: "OTP sent successfully" });
 };
