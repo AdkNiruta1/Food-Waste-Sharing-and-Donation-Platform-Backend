@@ -1,10 +1,10 @@
 import FoodPost from "../models/foodPostModel.js";
 import { sendResponse } from "../utils/responseHandler.js"; // your custom helper
 import { saveCompressedImage } from "../utils/saveImage.js";
-import {  logActivity } from "../utils/logger.js";
+import { logActivity } from "../utils/logger.js";
 import FoodRequest from "../models/foodRequestModel.js";
-import {  createNotification,  sendNotificationAll } from "./notificationController.js";
-
+import { createNotification, sendNotificationAll } from "./notificationController.js";
+import mongoose from "mongoose";
 // Create a new food donation
 export const createFoodDonation = async (req, res) => {
   try {
@@ -111,7 +111,7 @@ export const getMyDonationsHistory = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
 
-    const donations = await FoodPost.find({ donor: req.session.userId, status:"completed" });
+    const donations = await FoodPost.find({ donor: req.session.userId, status: "completed" });
     return sendResponse(res, { status: 200, data: donations });
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
@@ -122,7 +122,7 @@ export const getMyActiveDonations = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
 
-    const donations = await FoodPost.find({ donor: req.session.userId, status:"accepted" });
+    const donations = await FoodPost.find({ donor: req.session.userId, status: "accepted" });
     return sendResponse(res, { status: 200, data: donations });
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
@@ -140,7 +140,7 @@ export const getMyDonations = async (req, res) => {
 
     const donations = await FoodPost.find({
       donor: req.session.userId,
-      status: "available", 
+      status: "available",
     })
       .sort({ createdAt: -1 });
 
@@ -243,7 +243,7 @@ export const rejectedFoodRequest = async (req, res) => {
     await createNotification(request.receiver, "Your food request has been rejected");
     await logActivity("your food request has been rejected", request.receiver);
     await logActivity("Food Request Rejected", req.session.userId);
-    return sendResponse(res, { status: 200, message: "Request rejected", data: request });  
+    return sendResponse(res, { status: 200, message: "Request rejected", data: request });
   } catch (err) {
     return sendResponse(res, { status: 500, message: err.message });
   }
@@ -360,25 +360,60 @@ export const updateFoodDonation = async (req, res) => {
       status: 500,
       message: error.message,
     });
-  }  
+  }
 };
 // Get food requests for a specific food post by receiver to get details
-export const getFoodRequestsDetails = async (req, res) => {
+export const getFoodRequestDetails = async (req, res) => {
   try {
-    const { foodPostId } = req.params;
-    const requests = await FoodRequest.find({ foodPost: foodPostId })
-      .populate("receiver")
-      .sort({ createdAt: -1 });
-    return sendResponse(res, { status: 200, data: requests });
+    const receiverId = req.session.userId;
+    if (!receiverId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    const { id: requestId } = req.params; // this is the FoodRequest _id
+    if (!requestId) {
+      return sendResponse(res, { status: 400, message: "Food request ID is required" });
+    }
+
+    // Find the specific food request by its ID
+    const request = await FoodRequest.findById(requestId)
+      .populate({
+        path: "foodPost",
+        populate: {
+          path: "donor",
+        }
+      }).populate("receiver");
+
+    if (!request) {
+      return sendResponse(res, { status: 404, message: "Food request not found" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(receiverId)) {
+      return sendResponse(res, { status: 400, message: "Invalid receiver ID" });
+    }
+
+    // Convert the string to ObjectId using `new`
+    if (!request.receiver.equals(new mongoose.Types.ObjectId(receiverId))) {
+      return sendResponse(res, { status: 403, message: "Access denied" });
+    }
+
+
+    return sendResponse(res, { status: 200, data: request });
   } catch (err) {
     return sendResponse(res, { status: 500, message: err.message });
   }
 };
+
 // Get all food requests
 export const getListFoodRequests = async (req, res) => {
   try {
     const requests = await FoodRequest.find()
-      .populate("receiver")
+      .populate({
+        path: "receiver", path: "foodPost",
+        populate: {
+          path: "donor",
+        },
+      })
       .sort({ createdAt: -1 });
     return sendResponse(res, { status: 200, data: requests });
   } catch (err) {
@@ -427,12 +462,12 @@ export const cancelFoodRequest = async (req, res) => {
     if (!request) return sendResponse(res, { status: 404, message: "Request not found" });
     request.status = "cancelled";
     await request.save();
-    request.foodPost.status = "available";
-    await request.foodPost.save();
+    // request.foodPost.status = "available";
+    // await request.foodPost.save();
     await createNotification(request.receiver, "Your food request has been cancelled");
     await logActivity("your food request has been cancelled", request.receiver);
     await logActivity("Food Request Cancelled", req.session.userId);
-    return sendResponse(res, { status: 200, message: "Request cancelled", data: request });  
+    return sendResponse(res, { status: 200, message: "Request cancelled", data: request });
   } catch (err) {
     return sendResponse(res, { status: 500, message: err.message });
   }
