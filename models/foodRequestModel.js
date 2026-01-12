@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const foodRequestSchema = new mongoose.Schema({
   foodPost: { type: mongoose.Schema.Types.ObjectId, ref: "FoodPost", required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: "Users", required: true },
-  status: { type: String, enum: ["pending", "accepted", "completed", "rejected"], default: "pending" },
+  status: { type: String, enum: ["pending", "accepted", "completed", "rejected", "cancelled"], default: "pending" },
   requestedAt: { type: Date, default: Date.now },
   acceptedAt: Date,
   completedAt: Date,

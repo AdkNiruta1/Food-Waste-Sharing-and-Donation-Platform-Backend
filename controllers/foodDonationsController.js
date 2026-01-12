@@ -65,7 +65,7 @@ export const createFoodDonation = async (req, res) => {
   }
 };
 
-// Get all food donations
+// Get all food donations posted
 export const getAllFoodDonations = async (req, res) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -128,7 +128,7 @@ export const getMyActiveDonations = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
-// Get donations by donor
+// Get donations list by donor
 export const getMyDonations = async (req, res) => {
   try {
     if (!req.session.userId) {
@@ -157,13 +157,14 @@ export const getMyDonations = async (req, res) => {
   }
 };
 
-//reciver request food
+//reciver send request food to food onwers
 export const requestFood = async (req, res) => {
   try {
     if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
 
     const { foodPostId } = req.body;
     const foodPost = await FoodPost.findById(foodPostId);
+    console.log(foodPost);
     if (!foodPost) return sendResponse(res, { status: 404, message: "Food post not found" });
     if (foodPost.status !== "available") return sendResponse(res, { status: 400, message: "Food not available" });
 
@@ -226,7 +227,7 @@ export const completeFoodRequest = async (req, res) => {
     return sendResponse(res, { status: 500, message: err.message });
   }
 };
-
+//reject food request
 export const rejectedFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -274,6 +275,7 @@ export const getFoodLocations = async (req, res) => {
   }
 };
 // GET /api/food/:id
+// Get food donation details by ID with all requests details
 export const getFoodById = async (req, res) => {
   try {
     const food = await FoodPost.findById(req.params.id)
@@ -287,7 +289,7 @@ export const getFoodById = async (req, res) => {
       });
     }
 
-    // 🔥 Fetch all requests for this food
+    // Fetch all requests for this food
     const requests = await FoodRequest.find({
       foodPost: food._id,
     })
@@ -308,7 +310,7 @@ export const getFoodById = async (req, res) => {
     });
   }
 };
-
+// delete food donation by food owners
 export const deleteFoodDonation = async (req, res) => {
   try {
     const foodId = req.params.id;
@@ -331,7 +333,7 @@ export const deleteFoodDonation = async (req, res) => {
     });
   }
 };
-
+// Update food donation by food owners
 export const updateFoodDonation = async (req, res) => {
   try {
     const foodId = req.params.id;
@@ -359,4 +361,79 @@ export const updateFoodDonation = async (req, res) => {
       message: error.message,
     });
   }  
+};
+// Get food requests for a specific food post by receiver to get details
+export const getFoodRequestsDetails = async (req, res) => {
+  try {
+    const { foodPostId } = req.params;
+    const requests = await FoodRequest.find({ foodPost: foodPostId })
+      .populate("receiver")
+      .sort({ createdAt: -1 });
+    return sendResponse(res, { status: 200, data: requests });
+  } catch (err) {
+    return sendResponse(res, { status: 500, message: err.message });
+  }
+};
+// Get all food requests
+export const getListFoodRequests = async (req, res) => {
+  try {
+    const requests = await FoodRequest.find()
+      .populate("receiver")
+      .sort({ createdAt: -1 });
+    return sendResponse(res, { status: 200, data: requests });
+  } catch (err) {
+    return sendResponse(res, { status: 500, message: err.message });
+  }
+};
+// get my food requests by receiver
+export const getMyFoodRequestsList = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
+    }
+
+    const requests = await FoodRequest.find({
+      receiver: req.session.userId,
+    })
+      .populate({
+        path: "foodPost",
+        populate: {
+          path: "donor",
+        },
+      })
+      .sort({ createdAt: -1 });
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Food requests fetched successfully",
+      data: requests,
+    });
+  } catch (err) {
+    return sendResponse(res, {
+      status: 500,
+      message: err.message,
+    });
+  }
+};
+
+// cancelled request by receiver
+export const cancelFoodRequest = async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    const request = await FoodRequest.findById(requestId).populate("foodPost");
+    if (!request) return sendResponse(res, { status: 404, message: "Request not found" });
+    request.status = "cancelled";
+    await request.save();
+    request.foodPost.status = "available";
+    await request.foodPost.save();
+    await createNotification(request.receiver, "Your food request has been cancelled");
+    await logActivity("your food request has been cancelled", request.receiver);
+    await logActivity("Food Request Cancelled", req.session.userId);
+    return sendResponse(res, { status: 200, message: "Request cancelled", data: request });  
+  } catch (err) {
+    return sendResponse(res, { status: 500, message: err.message });
+  }
 };

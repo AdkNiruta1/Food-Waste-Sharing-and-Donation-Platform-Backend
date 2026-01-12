@@ -58,17 +58,18 @@ export const getAllUsers = async (req, res) => {
 
 // Get user by ID
 /// GET /api/admin/user/:id
+// Get user details by ID
 export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
-// Check if user exists
+    // Check if user exists
     if (!user) {
       return sendResponse(res, {
         status: 404,
         message: "User not found",
       });
     }
-// Send response
+    // Send response
     return sendResponse(res, {
       message: "User fetched successfully",
       data: user,
@@ -86,25 +87,26 @@ export const getUserById = async (req, res) => {
  * @route   PUT /api/admin/verify-user/:id
  * @access  Admin
  */
+// Verify user documents by admin
 export const verifyUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-// Check if user exists
+    // Check if user exists
     if (!user) {
       return sendResponse(res, {
         status: 404,
         message: "User not found",
       });
     }
-// Update user verification status
-  user.accountVerified = "verified";
-  await user.save();
-  await logActivity("User Verified", req.session.userId, user._id);
-  await createNotification(user._id, "Your account has been verified by admin");
-  await sendEmail({
-  to: user.email,
-  subject: "Account Verified Successfully | Annapurna Bhandar",
-  html: `
+    // Update user verification status
+    user.accountVerified = "verified";
+    await user.save();
+    await logActivity("User Verified", req.session.userId, user._id);
+    await createNotification(user._id, "Your account has been verified by admin");
+    await sendEmail({
+      to: user.email,
+      subject: "Account Verified Successfully | Annapurna Bhandar",
+      html: `
   <div style="
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f4f6f8;
@@ -185,9 +187,9 @@ export const verifyUser = async (req, res) => {
     </div>
   </div>
   `,
-});
+    });
 
-// Send response
+    // Send response
     return sendResponse(res, {
       message: "User verified successfully",
     });
@@ -199,12 +201,12 @@ export const verifyUser = async (req, res) => {
   }
 };
 
-// Reject user documents
+// Reject user documents by admin
 
 export const rejectUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-// Check if user exists
+    // Check if user exists
     if (!user) {
       return sendResponse(res, {
         status: 404,
@@ -212,7 +214,7 @@ export const rejectUser = async (req, res) => {
       });
     }
 
-// Update user verification status
+    // Update user verification status
     user.accountVerified = "rejected";
     user.rejectionReason = req.body.reason || "Not specified";
     const token = crypto.randomBytes(32).toString("hex");
@@ -226,13 +228,13 @@ export const rejectUser = async (req, res) => {
       "Your documents were rejected. Please resubmit with valid documents."
     );
     // Send rejection email with resubmit link
-  const resubmitLink = `${process.env.CLIENT_URL}/resubmit-documents/${token}`;
+    const resubmitLink = `${process.env.CLIENT_URL}/resubmit-documents/${token}`;
 
     //send email notification could be added here
     await sendEmail({
-  to: user.email,
-  subject: "Document Verification Failed – Action Required | Annapurna Bhandar",
-  html: `
+      to: user.email,
+      subject: "Document Verification Failed – Action Required | Annapurna Bhandar",
+      html: `
   <div style="
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f4f6f8;
@@ -325,9 +327,9 @@ export const rejectUser = async (req, res) => {
     </div>
   </div>
   `,
-});
+    });
 
-// Send response
+    // Send response
     return sendResponse(res, {
       message: "User rejected successfully",
     });
@@ -342,7 +344,7 @@ export const rejectUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
-// Check if user exists
+    // Check if user exists
     if (!user) {
       return sendResponse(res, {
         status: 404,
@@ -351,7 +353,67 @@ export const deleteUser = async (req, res) => {
     }
     // Log activity
     await logActivity("User Deleted", req.session.userId, user._id);
-// Send response
+    await createNotification(user._id, "Your account has been deleted by admin");
+    await sendEmail({
+      to: user.email,
+      subject: "Account Deleted | Annapurna Bhandar",
+      html: `
+      <div style="
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8;
+        padding: 30px;
+      ">
+        <div style="
+          max-width: 600px;
+          margin: 0 auto;
+          background-color: white;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        ">
+          <!-- Header -->
+          <div style="
+            background-color: #dc2626;
+            padding: 15px;
+            text-align: center;
+            color: #ffffff;
+          ">
+            <h1 style="margin: 0;">Account Deleted</h1>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 30px; color: #334155;">
+            <p>
+              Hello <strong>${user.name || "User"}</strong>,
+            </p>
+
+            <p>
+              We regret to inform you that your account has been <strong>permanently deleted</strong>.
+            </p>
+
+            <p>
+              If you have any questions or concerns, please contact our support team.
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="
+            background-color: #f1f5f9;
+            padding: 15px;
+            text-align: center;
+            font-size: 13px;
+            color: #64748b;
+          ">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} Annapurna Bhandar. All rights reserved.
+            </p>
+          </div>
+
+        </div>
+      </div>
+      `,
+    });
+    // Send response
     return sendResponse(res, {
       message: "User deleted successfully",
     });
@@ -372,7 +434,7 @@ export const getAdminStats = async (req, res) => {
     const recipients = await User.countDocuments({ role: "recipient" });
     const verifiedUsers = await User.countDocuments({ verified: true });
     const pendingUsers = await User.countDocuments({ verified: false });
-// Send response
+    // Send response
     return sendResponse(res, {
       data: {
         totalUsers,
@@ -394,11 +456,11 @@ export const getAdminStats = async (req, res) => {
 export const exportUsersCSV = async (req, res) => {
   try {
     const users = await User.find().select("-password");
-// Convert users to CSV
+    // Convert users to CSV
     const fields = ["name", "email", "role", "phone", "verified", "createdAt"];
     const parser = new Parser({ fields });
     const csv = parser.parse(users);
-// Set response headers and send CSV
+    // Set response headers and send CSV
     res.header("Content-Type", "text/csv");
     res.attachment("users.csv");
     await logActivity("Exported Users CSV", req.session.userId);

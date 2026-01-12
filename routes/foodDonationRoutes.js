@@ -12,7 +12,7 @@ import {
   getMyActiveDonations,
   getMyDonationsHistory,
   deleteFoodDonation,
-  updateFoodDonation
+  updateFoodDonation,getFoodRequestsDetails,getListFoodRequests,cancelFoodRequest,getMyFoodRequestsList
 } from "../controllers/foodDonationsController.js";
 import { upload } from "../middleware/upload.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -31,6 +31,9 @@ router.post("/reject",protect, rejectedFoodRequest);
 router.get("/:id",protect, getFoodById);
 router.delete("/:id",protect, deleteFoodDonation);
 router.put("/:id",protect, upload.fields([{ name: "photo" }]), updateFoodDonation);
-
+router.get("/:id/requests-details",protect, getFoodRequestsDetails);
+router.get("/requests/list",protect, getListFoodRequests);
+router.get("/my/requests",protect, getMyFoodRequestsList);
+router.post("/request/cancel",protect, cancelFoodRequest);
 
 export default router;
