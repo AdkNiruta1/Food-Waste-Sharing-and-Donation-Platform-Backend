@@ -1,6 +1,37 @@
 // controllers/ratingController.js
 import Rating from "../models/RatingModel.js";
+import { logActivity } from "../utils/logger.js";
 import { sendResponse } from "../utils/responseHandler.js";
+import { createNotification } from "./notificationController.js";
+import User from "../models/userModel.js";
+import mongoose from "mongoose";
+
+// Helper function to update user's average rating and rating count
+const updateUserAverageRating = async (userId) => {
+  const stats = await Rating.aggregate([
+    { $match: { receiver: new mongoose.Types.ObjectId(userId) } },
+    {
+      $group: {
+        _id: "$receiver",
+        avgRating: { $avg: "$rating" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  if (stats.length > 0) {
+    await User.findByIdAndUpdate(userId, {
+      rating: Number(stats[0].avgRating.toFixed(2)),
+      ratingCount: stats[0].count,
+    });
+  } else {
+    await User.findByIdAndUpdate(userId, {
+      rating: 0,
+      ratingCount: 0,
+    });
+  }
+};
+
 
 // Create or update rating
 export const rateUser = async (req, res) => {
@@ -33,7 +64,7 @@ export const rateUser = async (req, res) => {
     await createNotification(receiverId, "You have a new rating");
     await logActivity("Rating Created", req.session.userId);
 
-
+    await updateUserAverageRating(receiverId);
     if (newRating) {
       await createNotification(receiverId, "You have a new rating");
       await logActivity("Rating Created", req.session.userId);

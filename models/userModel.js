@@ -49,6 +49,11 @@ const UserSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  rating: { type: Number, default: 0 },
+  ratingCount: {
+    type: Number,
+    default: 0,
+  },
   resubmitToken: String,
   resubmitTokenExpires: Date,
   emailVerified: { type: String, enum: ["pending", "verified"], default: "pending" },

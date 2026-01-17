@@ -164,7 +164,6 @@ export const requestFood = async (req, res) => {
 
     const { foodPostId } = req.body;
     const foodPost = await FoodPost.findById(foodPostId);
-    console.log(foodPost);
     if (!foodPost) return sendResponse(res, { status: 404, message: "Food post not found" });
     if (foodPost.status !== "available") return sendResponse(res, { status: 400, message: "Food not available" });
 
@@ -186,47 +185,165 @@ export const requestFood = async (req, res) => {
 export const acceptFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
-    const request = await FoodRequest.findById(requestId).populate("foodPost");
-    if (!request) return sendResponse(res, { status: 404, message: "Request not found" });
+
+    const request = await FoodRequest
+      .findById(requestId)
+      .populate("foodPost");
+
+    if (!request) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Request not found",
+      });
+    }
+
+    // 🔐 Only donor can accept
+    if (request.foodPost.donor.toString() !== req.session.userId) {
+      return sendResponse(res, {
+        status: 403,
+        message: "Access denied",
+      });
+    }
+
+    // 🛑 If already accepted
+    if (request.status === "accepted") {
+      return sendResponse(res, {
+        status: 400,
+        message: "Request already accepted",
+      });
+    }
+
+    /* ---------------- ACCEPT SELECTED REQUEST ---------------- */
     request.status = "accepted";
     request.acceptedAt = new Date();
     await request.save();
 
-    request.foodPost.status = "accepted";
+    /* ---------------- REJECT ALL OTHER REQUESTS ---------------- */
+    await FoodRequest.updateMany(
+      {
+        foodPost: request.foodPost._id,
+        _id: { $ne: request._id },
+      },
+      {
+        status: "rejected",
+        rejectedAt: new Date(),
+      }
+    );
+
+    /* ---------------- UPDATE FOOD POST ---------------- */
+    request.foodPost.status = "accepted"; // or "reserved"
     request.foodPost.acceptedRequest = request._id;
     await request.foodPost.save();
-    await createNotification(request.receiver, "Your food request has been accepted");
-    await logActivity("your food request has been accepted", request.receiver);
-    await logActivity("Food Request Accepted", req.session.userId);
 
-    return sendResponse(res, { status: 200, message: "Request accepted", data: request });
+    /* ---------------- NOTIFICATIONS ---------------- */
+    await createNotification(
+      request.receiver,
+      "Your food request has been accepted 🎉"
+    );
+
+    await createNotification(
+      request.foodPost.donor,
+      "You accepted a food request"
+    );
+
+    /* ---------------- ACTIVITY LOGS ---------------- */
+    await logActivity(
+      "Food Request Accepted",
+      req.session.userId
+    );
+
+    await logActivity(
+      "Your food request was accepted",
+      request.receiver
+    );
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Request accepted successfully",
+      data: request,
+    });
 
   } catch (err) {
-    return sendResponse(res, { status: 500, message: err.message });
+    return sendResponse(res, {
+      status: 500,
+      message: err.message,
+    });
   }
 };
+
 
 //complete food request
 export const completeFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
-    const request = await FoodRequest.findById(requestId).populate("foodPost");
-    if (!request) return sendResponse(res, { status: 404, message: "Request not found" });
+
+    const request = await FoodRequest
+      .findById(requestId)
+      .populate("foodPost");
+
+    if (!request) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Request not found",
+      });
+    }
+
+    /* ❌ Only accepted request can be completed */
+    if (request.status !== "accepted") {
+      return sendResponse(res, {
+        status: 400,
+        message: "Only accepted requests can be completed",
+      });
+    }
+
+    /* ❌ Prevent double completion */
+    if (request.foodPost.status === "completed") {
+      return sendResponse(res, {
+        status: 400,
+        message: "Food already completed",
+      });
+    }
+
+    /* ✅ COMPLETE REQUEST */
     request.status = "completed";
     request.completedAt = new Date();
     await request.save();
 
+    /* 🍲 UPDATE FOOD POST */
     request.foodPost.status = "completed";
     await request.foodPost.save();
-    await createNotification(request.receiver, "Your food request has been completed");
-    await logActivity("your food request has been completed", request.receiver);
-    await logActivity("Food Request Completed", req.session.userId);
-    return sendResponse(res, { status: 200, message: "Food delivery completed", data: request });
+
+    /* 🔔 NOTIFICATIONS */
+    await createNotification(
+      request.receiver,
+      "Your food request has been completed 🍲"
+    );
+
+    /* 🧾 ACTIVITY LOGS */
+    await logActivity(
+      "Food Request Completed",
+      req.session.userId
+    );
+
+    await logActivity(
+      "Your food request was completed",
+      request.receiver
+    );
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Food delivery completed successfully",
+      data: request,
+    });
 
   } catch (err) {
-    return sendResponse(res, { status: 500, message: err.message });
+    return sendResponse(res, {
+      status: 500,
+      message: err.message,
+    });
   }
 };
+
 //reject food request
 export const rejectedFoodRequest = async (req, res) => {
   try {
@@ -439,6 +556,7 @@ export const getMyFoodRequestsList = async (req, res) => {
           path: "donor",
         },
       })
+      .populate("receiver")
       .sort({ createdAt: -1 });
 
     return sendResponse(res, {

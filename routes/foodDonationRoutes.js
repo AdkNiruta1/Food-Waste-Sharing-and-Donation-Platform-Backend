@@ -46,7 +46,7 @@ router.delete("/:id",protect, deleteFoodDonation);
 router.put("/:id",protect, upload.fields([{ name: "photo" }]), updateFoodDonation);
 // Get food requests details for a food post and donor
 router.get("/:id/requests-details",protect, getFoodRequestDetails);
-// Get all food requests
+// Get all food requests for admins
 router.get("/requests/list",protect, getListFoodRequests);
 // Get my food requests
 router.get("/my/requests",protect, getMyFoodRequestsList);
