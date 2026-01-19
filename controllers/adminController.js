@@ -755,3 +755,45 @@ export const exportFullAppReportForMonth = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
+
+// get the list of food post with request deatils and donor details
+export const getListFoodPost = async (req, res) => {
+  try {
+    const foodPosts = await foodPostModel
+      .find()
+      .populate("donor")
+      .populate("acceptedRequest", "receiver")
+      .lean();
+
+    return sendResponse(res, {
+      status: 200,
+      data: foodPosts,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// get the food post with request deatils and donor details
+export const getFoodPost = async (req, res) => {
+  try {
+    const foodPost = await foodPostModel
+      .findById(req.params.id)
+      .populate("donor")
+      .populate("acceptedRequest", "receiver")
+      .lean();
+
+    return sendResponse(res, {
+      status: 200,
+      data: foodPost,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
