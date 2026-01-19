@@ -32,5 +32,9 @@ const foodPostSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
+foodPostSchema.virtual("requests", {
+  ref: "FoodRequest",
+  localField: "_id",
+  foreignField: "foodPost",
+});
 export default mongoose.model("FoodPost", foodPostSchema);

@@ -762,7 +762,6 @@ export const getListFoodPost = async (req, res) => {
     const foodPosts = await foodPostModel
       .find()
       .populate("donor")
-      .populate("acceptedRequest", "receiver")
       .lean();
 
     return sendResponse(res, {
@@ -776,6 +775,58 @@ export const getListFoodPost = async (req, res) => {
     });
   }
 };
+export const getFoodPostWithPagination = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || "";
+
+    // Build search query
+    const query = search
+      ? {
+          $or: [
+            { title: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+            { district: { $regex: search, $options: "i" } },
+            { city: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+
+    // Count total matching documents
+    const total = await foodPostModel.countDocuments(query);
+
+    // Fetch paginated food posts
+    const foodPosts = await foodPostModel
+      .find(query)
+      .populate("donor")
+      .populate({
+        path: "requests",
+        populate: { path: "receiver" },
+      })
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const pagination = getPagination(page, limit, total);
+
+    return sendResponse(res, {
+      status: 200,
+      data: {
+        foodPosts,
+        pagination,
+      },
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
 
 // get the food post with request deatils and donor details
 export const getFoodPost = async (req, res) => {

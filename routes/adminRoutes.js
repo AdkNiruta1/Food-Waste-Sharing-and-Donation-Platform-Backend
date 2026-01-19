@@ -13,7 +13,8 @@ import {
   getListFoodPost,
   getDonationsOverTime,
   getFoodTypeDistribution,
-  getRequestStatusOverview
+  getRequestStatusOverview,
+  getFoodPostWithPagination
 } from "../controllers/adminController.js";
 import { adminRoutes, protect } from "../middleware/authMiddleware.js";
 
@@ -49,4 +50,6 @@ router.get("/food-type-distribution", adminRoutes, getFoodTypeDistribution);
 
 // get request status overview
 router.get("/request-status-overview", adminRoutes, getRequestStatusOverview);
+// get food post with pagination
+router.get("/food-post", adminRoutes, getFoodPostWithPagination);
 export default router;

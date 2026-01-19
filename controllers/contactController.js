@@ -1,4 +1,5 @@
 import ContactMessage from "../models/ContactMessage.js";
+import { getPagination } from "../utils/pagination.js";
 import {sendResponse} from "../utils/responseHandler.js";
 
 export const submitContactForm = async (req, res) => {
@@ -51,10 +52,33 @@ export const submitContactForm = async (req, res) => {
 
 export const getContactMessages = async (req, res) => {
   try {
-    const messages = await ContactMessage.find();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const search = req.query.search || "";
+
+    // Build search query if needed
+    const query = search
+      ? { message: { $regex: search, $options: "i" } } // case-insensitive search in message field
+      : {};
+
+    const total = await ContactMessage.countDocuments(query);
+
+    const messages = await ContactMessage.find(query)
+      .sort({ createdAt: -1 }) // latest first
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalPages = Math.ceil(total / limit);
+    const pagination = getPagination(page, limit, total, totalPages);
     return sendResponse(res, {
       status: 200,
-      data: messages,
+      data: {
+        messages,
+        pagination,
+      },
     });
   } catch (error) {
     return sendResponse(res, {
