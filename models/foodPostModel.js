@@ -27,7 +27,7 @@ const foodPostSchema = new mongoose.Schema(
     lng: { type: Number },
     pickupInstructions: { type: String, required: true },
     photo: { type: String }, // optional URL/path
-    status: { type: String, enum: ["available", "accepted", "completed"], default: "available" },
+    status: { type: String, enum: ["available", "accepted","expired", "completed"], default: "available" },
      acceptedRequest: { type: mongoose.Schema.Types.ObjectId, ref: "FoodRequest" },
   },
   { timestamps: true }

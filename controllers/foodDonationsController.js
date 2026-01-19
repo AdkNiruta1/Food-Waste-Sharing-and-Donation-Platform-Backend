@@ -5,6 +5,7 @@ import { logActivity } from "../utils/logger.js";
 import FoodRequest from "../models/foodRequestModel.js";
 import { createNotification, sendNotificationAll } from "./notificationController.js";
 import mongoose from "mongoose";
+import Rating from "../models/RatingModel.js";
 // Create a new food donation
 export const createFoodDonation = async (req, res) => {
   try {
@@ -106,28 +107,193 @@ export const getAllFoodDonations = async (req, res) => {
 };
 
 
-// Get donations by donor with status completed
+// Get donations history by donor
+
 export const getMyDonationsHistory = async (req, res) => {
   try {
-    if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
 
-    const donations = await FoodPost.find({ donor: req.session.userId, status: "completed" });
-    return sendResponse(res, { status: 200, data: donations });
+    // 1️⃣ Fetch all food posts of current donor
+    const foodPosts = await FoodPost.find({ donor: req.session.userId })
+      .populate({
+        path: "acceptedRequest",       // Only the accepted request
+        populate: { path: "receiver" } // Populate receiver inside acceptedRequest
+      })
+      .sort({ updatedAt: -1 });
+
+    // 2️⃣ For each food post, add rating given by the accepted receiver
+    const enriched = await Promise.all(
+      foodPosts.map(async (post) => {
+        const acceptedRequest = post.acceptedRequest;
+
+        let ratingDoc = null;
+        if (acceptedRequest?.receiver) {
+          ratingDoc = await Rating.findOne({
+            rater: acceptedRequest.receiver._id, // who gave rating
+            receiver: req.session.userId         // current donor
+          });
+        }
+
+        return {
+          ...post.toObject(),
+          acceptedRequest: acceptedRequest ? acceptedRequest.toObject() : null,
+          rating: ratingDoc
+            ? { value: ratingDoc.rating, comment: ratingDoc.comment }
+            : null
+        };
+      })
+    );
+
+    return sendResponse(res, {
+      status: 200,
+      data: enriched
+    });
+
   } catch (error) {
-    return sendResponse(res, { status: 500, message: error.message });
+    return sendResponse(res, {
+      status: 500,
+      message: error.message
+    });
   }
 };
+
+// get donations history by donor by id
+
+export const getMyDonationsHistoryById = async (req, res) => {
+  try {
+    // 1️⃣ Auth check
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    // 2️⃣ Fetch all food posts of current donor
+    const { foodPostId } = req.params;
+
+    // 1️⃣ Fetch all food posts of current donor
+    const foodPosts = await FoodPost.find({ _id: foodPostId, donor: req.session.userId })
+      .populate({
+        path: "acceptedRequest",       // Only the accepted request
+        populate: { path: "receiver" } // Populate receiver inside acceptedRequest
+      })
+      .sort({ updatedAt: -1 });
+
+    // 2️⃣ For each food post, add rating given by the accepted receiver
+    const enriched = await Promise.all(
+      foodPosts.map(async (post) => {
+        const acceptedRequest = post.acceptedRequest;
+
+        let ratingDoc = null;
+        if (acceptedRequest?.receiver) {
+          ratingDoc = await Rating.findOne({
+            rater: acceptedRequest.receiver._id, // who gave rating
+            receiver: req.session.userId         // current donor
+          });
+        }
+
+        return {
+          ...post.toObject(),
+          acceptedRequest: acceptedRequest ? acceptedRequest.toObject() : null,
+          rating: ratingDoc
+            ? { value: ratingDoc.rating, comment: ratingDoc.comment }
+            : null
+        };
+      })
+    );
+
+    return sendResponse(res, {
+      status: 200,
+      data: enriched
+    });
+
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message
+    });
+  }
+};
+
+
 // Get donations by donor with status accepted
 export const getMyActiveDonations = async (req, res) => {
   try {
-    if (!req.session.userId) return sendResponse(res, { status: 401, message: "Not logged in" });
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
 
-    const donations = await FoodPost.find({ donor: req.session.userId, status: "accepted" });
-    return sendResponse(res, { status: 200, data: donations });
+    const activeRequests = await FoodRequest.find({
+      status: "accepted",
+    })
+      .populate({
+        path: "foodPost",
+        match: { donor: req.session.userId },
+      })
+      .populate("receiver")
+      .sort({ updatedAt: -1 });
+
+    // remove null foodPosts (not belonging to this donor)
+    const filtered = activeRequests.filter(r => r.foodPost);
+
+    return sendResponse(res, {
+      status: 200,
+      data: filtered,
+    });
   } catch (error) {
-    return sendResponse(res, { status: 500, message: error.message });
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
   }
 };
+
+// get my active donations by donor by id
+export const getMyActiveDonationById = async (req, res) => {
+  try {
+    // 1️⃣ Auth check
+    if (!req.session.userId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
+    }
+
+    const { requestId } = req.params;
+
+    // 2️⃣ Find accepted request by ID
+    const request = await FoodRequest.findOne({
+      _id: requestId,
+      status: "accepted",
+    })
+      .populate({
+        path: "foodPost",
+        match: { donor: req.session.userId }, // 🔐 donor-only access
+      })
+      .populate("receiver");
+
+    // 3️⃣ Not found or not owned by donor
+    if (!request || !request.foodPost) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Request not found or unauthorized",
+      });
+    }
+
+    // 4️⃣ Success
+    return sendResponse(res, {
+      status: 200,
+      data: request,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+
 // Get donations list by donor
 export const getMyDonations = async (req, res) => {
   try {

@@ -7,6 +7,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import activityLogRoutes from "./routes/activityLogRoutes.js";
 import foodDonationRoutes from "./routes/foodDonationRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
 import ratingRoutes from "./routes/ratingRoutes.js"
 import path from "path";
 import mongoose from "mongoose";
@@ -63,6 +64,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/activity-logs", activityLogRoutes);
 app.use("/api/food-donations", foodDonationRoutes)
 app.use("/api/ratings", ratingRoutes)
+app.use("/api/contact", contactRoutes)
 
 
 // Server
