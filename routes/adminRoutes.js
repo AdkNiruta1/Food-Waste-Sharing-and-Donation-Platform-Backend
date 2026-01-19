@@ -7,6 +7,7 @@ import {
   deleteUser,
   getAdminStats,
   exportUsersCSV,
+  exportFullAppReport
 } from "../controllers/adminController.js";
 import { adminRoutes, protect } from "../middleware/authMiddleware.js";
 
@@ -22,5 +23,6 @@ router.delete("/delete-user/:id", adminRoutes, deleteUser);
 
 router.get("/stats", adminRoutes, getAdminStats);
 router.get("/export/users", adminRoutes, exportUsersCSV);
+router.get("/export/full-report", adminRoutes, exportFullAppReport);
 
 export default router;

@@ -6,7 +6,10 @@ import { createNotification } from "./notificationController.js";
 import { Parser } from "json2csv";
 import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto";
-
+import foodPostModel from "../models/foodPostModel.js";
+import foodRequestModel from "../models/foodRequestModel.js";
+import Rating from "../models/RatingModel.js";
+import archiver from "archiver";
 // ADMIN CONTROLLER FUNCTIONS
 // Get all users with optional filters
 export const getAllUsers = async (req, res) => {
@@ -455,16 +458,147 @@ export const getAdminStats = async (req, res) => {
 // Export users as CSV
 export const exportUsersCSV = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
-    // Convert users to CSV
-    const fields = ["name", "email", "role", "phone", "verified", "createdAt"];
+    // Optional: only admin can export
+    if (req.session.role !== "admin") {
+      return sendResponse(res, { status: 403, message: "Access denied" });
+    }
+
+    const users = await User.find()
+      .select(
+        "name email phone role emailVerified accountVerified rating ratingCount createdAt"
+      )
+      .lean();
+
+    const fields = [
+      "name",
+      "email",
+      "phone",
+      "role",
+      "emailVerified",
+      "accountVerified",
+      "rating",
+      "ratingCount",
+      "createdAt"
+    ];
+
     const parser = new Parser({ fields });
     const csv = parser.parse(users);
-    // Set response headers and send CSV
+
     res.header("Content-Type", "text/csv");
     res.attachment("users.csv");
-    await logActivity("Exported Users CSV", req.session.userId);
     return res.send(csv);
+
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
+export const exportFullAppReport = async (req, res) => {
+  try {
+    if (req.session.role !== "admin") {
+      return sendResponse(res, { status: 403, message: "Access denied" });
+    }
+
+    /* ================= USERS ================= */
+    const users = await User.find()
+      .select("-password -otp -otpExpires")
+      .lean();
+
+    const usersCSV = new Parser({
+      fields: [
+        "_id",
+        "name",
+        "email",
+        "phone",
+        "role",
+        "address",
+        "emailVerified",
+        "accountVerified",
+        "rejectionReason",
+        "rating",
+        "ratingCount",
+        "createdAt",
+      ],
+    }).parse(users);
+
+    /* ================= FOOD POSTS ================= */
+    const foodPosts = await foodPostModel.find()
+      .populate("donor", "name email")
+      .lean();
+
+    const foodPostsCSV = new Parser({
+      fields: [
+        "_id",
+        "title",
+        "description",
+        "type",
+        "quantity",
+        "unit",
+        "expiryDate",
+        "city",
+        "district",
+        "pickupInstructions",
+        "status",
+        "donor.name",
+        "donor.email",
+        "acceptedRequest",
+        "createdAt",
+      ],
+    }).parse(foodPosts);
+
+    /* ================= FOOD REQUESTS ================= */
+    const foodRequests = await foodRequestModel.find()
+      .populate("foodPost", "title")
+      .populate("receiver", "name email")
+      .lean();
+
+    const foodRequestsCSV = new Parser({
+      fields: [
+        "_id",
+        "foodPost.title",
+        "receiver.name",
+        "receiver.email",
+        "status",
+        "requestedAt",
+        "acceptedAt",
+        "createdAt",
+      ],
+    }).parse(foodRequests);
+
+    /* ================= RATINGS ================= */
+    const ratings = await Rating.find()
+      .populate("rater", "name")
+      .populate("receiver", "name")
+      .lean();
+
+    const ratingsCSV = new Parser({
+      fields: [
+        "_id",
+        "rater.name",
+        "receiver.name",
+        "rating",
+        "comment",
+        "createdAt",
+      ],
+    }).parse(ratings);
+
+    /* ================= ZIP FILE ================= */
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=full-app-report.zip"
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    archive.pipe(res);
+
+    archive.append(usersCSV, { name: "users.csv" });
+    archive.append(foodPostsCSV, { name: "food-posts.csv" });
+    archive.append(foodRequestsCSV, { name: "food-requests.csv" });
+    archive.append(ratingsCSV, { name: "ratings.csv" });
+
+    await archive.finalize();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
   }
