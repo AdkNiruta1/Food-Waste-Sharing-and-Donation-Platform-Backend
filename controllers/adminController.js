@@ -860,3 +860,95 @@ export const getDonationsOverTime = async (req, res) => {
     });
   }
 };
+// get the food type distribution
+export const getFoodTypeDistribution = async (req, res) => {
+  try {
+    const result = await foodPostModel.aggregate([
+      {
+        $group: {
+          _id: "$type",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const cookedCount =
+      result.find((r) => r._id === "cooked")?.count || 0;
+
+    const otherCount =
+      result.find((r) => r._id === "other")?.count || 0;
+
+    const total = cookedCount + otherCount;
+
+    // Avoid division by zero
+    const distribution = [
+      {
+        name: "Cooked",
+        value: total === 0 ? 0 : Math.round((cookedCount / total) * 100),
+      },
+      {
+        name: "Other",
+        value: total === 0 ? 0 : Math.round((otherCount / total) * 100),
+      },
+    ];
+
+    return sendResponse(res, {
+      status: 200,
+      data: distribution,
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// Request Status Overview
+export const getRequestStatusOverview = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+
+    // Aggregate requests for this donor's posts
+    const statusCounts = await foodRequestModel.aggregate([
+      {
+        $lookup: {
+          from: "foodposts",            // join FoodPost collection
+          localField: "foodPost",
+          foreignField: "_id",
+          as: "foodPost",
+        },
+      },
+      { $unwind: "$foodPost" },
+      { $match: { "foodPost.donor": req.session.userId } }, // only this donor's posts
+      {
+        $group: {
+          _id: "$status",           // group by request status
+          count: { $sum: 1 },       // count number of requests
+        },
+      },
+    ]);
+
+    // Format data for chart
+    const allStatuses = ["pending", "accepted", "completed", "rejected"];
+    const chartData = allStatuses.map((status) => {
+      const found = statusCounts.find((s) => s._id === status);
+      return {
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        count: found ? found.count : 0,
+      };
+    });
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Request status overview fetched successfully",
+      data: chartData,
+    });
+  } catch (error) {
+    console.error(error);
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+

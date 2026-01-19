@@ -11,7 +11,9 @@ import {
   exportFullAppReportForMonth,
   getFoodPost,
   getListFoodPost,
-  getDonationsOverTime
+  getDonationsOverTime,
+  getFoodTypeDistribution,
+  getRequestStatusOverview
 } from "../controllers/adminController.js";
 import { adminRoutes, protect } from "../middleware/authMiddleware.js";
 
@@ -42,4 +44,9 @@ router.get("/food-post/list", adminRoutes, getListFoodPost);
 // get donations over time
 router.get("/donations-over-time", adminRoutes, getDonationsOverTime);
 
+// get food type distribution
+router.get("/food-type-distribution", adminRoutes, getFoodTypeDistribution);
+
+// get request status overview
+router.get("/request-status-overview", adminRoutes, getRequestStatusOverview);
 export default router;
