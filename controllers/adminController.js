@@ -578,7 +578,7 @@ export const exportFullAppReport = async (req, res) => {
         "receiver.name",
         "receiver.email",
         "receiver.phone",
-        "receiver.address", 
+        "receiver.address",
         "status",
         "requestedAt",
         "acceptedAt",
@@ -790,6 +790,69 @@ export const getFoodPost = async (req, res) => {
       status: 200,
       data: foodPost,
     });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+//  get the donations over time
+export const getDonationsOverTime = async (req, res) => {
+  try {
+    // last 7 days
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0);
+
+    const donations = await foodPostModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            day: { $dayOfWeek: "$createdAt" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          day: "$_id.day",
+          donations: "$count",
+        },
+      },
+    ]);
+
+    // Map MongoDB day numbers → labels
+    const daysMap = {
+      1: "Sun",
+      2: "Mon",
+      3: "Tue",
+      4: "Wed",
+      5: "Thu",
+      6: "Fri",
+      7: "Sat",
+    };
+
+    // Ensure all days appear (even with 0 donations)
+    const result = Object.values(daysMap).map(day => {
+      const found = donations.find(d => daysMap[d.day] === day);
+      return {
+        date: day,
+        donations: found ? found.donations : 0,
+      };
+    });
+
+    return sendResponse(res, {
+      status: 200,
+      data: result,
+    });
+
   } catch (error) {
     return sendResponse(res, {
       status: 500,
