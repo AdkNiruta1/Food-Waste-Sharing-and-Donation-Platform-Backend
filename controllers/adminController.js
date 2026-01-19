@@ -907,32 +907,17 @@ export const getFoodTypeDistribution = async (req, res) => {
 // Request Status Overview
 export const getRequestStatusOverview = async (req, res) => {
   try {
-    if (!req.session.userId) {
-      return sendResponse(res, { status: 401, message: "Not logged in" });
-    }
-
-    // Aggregate requests for this donor's posts
+    // Aggregate requests across all donors
     const statusCounts = await foodRequestModel.aggregate([
       {
-        $lookup: {
-          from: "foodposts",            // join FoodPost collection
-          localField: "foodPost",
-          foreignField: "_id",
-          as: "foodPost",
-        },
-      },
-      { $unwind: "$foodPost" },
-      { $match: { "foodPost.donor": req.session.userId } }, // only this donor's posts
-      {
         $group: {
-          _id: "$status",           // group by request status
-          count: { $sum: 1 },       // count number of requests
+          _id: "$status",      // group by request status
+          count: { $sum: 1 },  // count requests
         },
       },
     ]);
 
-    // Format data for chart
-    const allStatuses = ["pending", "accepted", "completed", "rejected"];
+    const allStatuses = ["pending", "accepted", "completed", "rejected", "cancelled"];
     const chartData = allStatuses.map((status) => {
       const found = statusCounts.find((s) => s._id === status);
       return {
@@ -943,7 +928,7 @@ export const getRequestStatusOverview = async (req, res) => {
 
     return sendResponse(res, {
       status: 200,
-      message: "Request status overview fetched successfully",
+      message: "Admin request status overview fetched successfully",
       data: chartData,
     });
   } catch (error) {
