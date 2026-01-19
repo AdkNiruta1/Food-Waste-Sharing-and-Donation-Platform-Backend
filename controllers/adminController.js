@@ -431,18 +431,14 @@ export const deleteUser = async (req, res) => {
 // Get admin dashboard statistics
 export const getAdminStats = async (req, res) => {
   try {
-    if (req.session.role !== "admin") {
-      return sendResponse(res, { status: 403, message: "Access denied" });
-    }
-
     // Total users
     const totalUsers = await User.countDocuments();
 
     // Total food posts
-    const totalFoodPosts = await FoodPost.countDocuments();
+    const totalFoodPosts = await foodPostModel.countDocuments();
 
     // Total food requests
-    const totalRequests = await FoodRequest.countDocuments();
+    const totalRequests = await foodRequestModel.countDocuments();
 
     // Average rating
     const ratingStats = await Rating.aggregate([
@@ -480,11 +476,6 @@ export const getAdminStats = async (req, res) => {
 // Export users as CSV
 export const exportUsersCSV = async (req, res) => {
   try {
-    // Optional: only admin can export
-    if (req.session.role !== "admin") {
-      return sendResponse(res, { status: 403, message: "Access denied" });
-    }
-
     const users = await User.find()
       .select(
         "name email phone role emailVerified accountVerified rating ratingCount createdAt"
@@ -517,10 +508,6 @@ export const exportUsersCSV = async (req, res) => {
 
 export const exportFullAppReport = async (req, res) => {
   try {
-    if (req.session.role !== "admin") {
-      return sendResponse(res, { status: 403, message: "Access denied" });
-    }
-
     /* ================= USERS ================= */
     const users = await User.find()
       .select("-password -otp -otpExpires")
@@ -545,7 +532,7 @@ export const exportFullAppReport = async (req, res) => {
 
     /* ================= FOOD POSTS ================= */
     const foodPosts = await foodPostModel.find()
-      .populate("donor", "name email")
+      .populate("donor", "name email phone address ")
       .lean();
 
     const foodPostsCSV = new Parser({
@@ -563,6 +550,8 @@ export const exportFullAppReport = async (req, res) => {
         "status",
         "donor.name",
         "donor.email",
+        "donor.phone",
+        "donor.address",
         "acceptedRequest",
         "createdAt",
       ],
@@ -570,16 +559,26 @@ export const exportFullAppReport = async (req, res) => {
 
     /* ================= FOOD REQUESTS ================= */
     const foodRequests = await foodRequestModel.find()
-      .populate("foodPost", "title")
-      .populate("receiver", "name email")
+      .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
+      .populate("receiver", "name email phone address")
       .lean();
 
     const foodRequestsCSV = new Parser({
       fields: [
         "_id",
         "foodPost.title",
+        "foodPost.description",
+        "foodPost.type",
+        "foodPost.quantity",
+        "foodPost.unit",
+        "foodPost.expiryDate",
+        "foodPost.city",
+        "foodPost.district",
+        "foodPost.pickupInstructions",
         "receiver.name",
         "receiver.email",
+        "receiver.phone",
+        "receiver.address", 
         "status",
         "requestedAt",
         "acceptedAt",
@@ -589,6 +588,137 @@ export const exportFullAppReport = async (req, res) => {
 
     /* ================= RATINGS ================= */
     const ratings = await Rating.find()
+      .populate("rater", "name")
+      .populate("receiver", "name")
+      .lean();
+
+    const ratingsCSV = new Parser({
+      fields: [
+        "_id",
+        "rater.name",
+        "receiver.name",
+        "rating",
+        "comment",
+        "createdAt",
+      ],
+    }).parse(ratings);
+
+    /* ================= ZIP FILE ================= */
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=full-app-report.zip"
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    archive.pipe(res);
+
+    archive.append(usersCSV, { name: "users.csv" });
+    archive.append(foodPostsCSV, { name: "food-posts.csv" });
+    archive.append(foodRequestsCSV, { name: "food-requests.csv" });
+    archive.append(ratingsCSV, { name: "ratings.csv" });
+
+    await archive.finalize();
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+// export full report csv for a month
+export const exportFullAppReportForMonth = async (req, res) => {
+  try {
+    const { month, year } = req.params;
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    /* ================= USERS ================= */
+    const users = await User.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+    })
+      .select("-password -otp -otpExpires")
+      .lean();
+
+    const usersCSV = new Parser({
+      fields: [
+        "_id",
+        "name",
+        "email",
+        "phone",
+        "role",
+        "address",
+        "emailVerified",
+        "accountVerified",
+        "rejectionReason",
+        "rating",
+        "ratingCount",
+        "createdAt",
+      ],
+    }).parse(users);
+
+    /* ================= FOOD POSTS ================= */
+    const foodPosts = await foodPostModel.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+    })
+      .populate("donor", "name email phone address")
+      .lean();
+
+    const foodPostsCSV = new Parser({
+      fields: [
+        "_id",
+        "title",
+        "description",
+        "type",
+        "quantity",
+        "unit",
+        "expiryDate",
+        "city",
+        "district",
+        "pickupInstructions",
+        "status",
+        "donor.name",
+        "donor.email",
+        "donor.phone",
+        "donor.address",
+        "acceptedRequest",
+        "createdAt",
+      ],
+    }).parse(foodPosts);
+
+    /* ================= FOOD REQUESTS ================= */
+    const foodRequests = await foodRequestModel.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+    })
+      .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
+      .populate("receiver", "name email phone address")
+      .lean();
+
+    const foodRequestsCSV = new Parser({
+      fields: [
+        "_id",
+        "foodPost.title",
+        "foodPost.description",
+        "foodPost.type",
+        "foodPost.quantity",
+        "foodPost.unit",
+        "foodPost.expiryDate",
+        "foodPost.city",
+        "foodPost.district",
+        "foodPost.pickupInstructions",
+        "receiver.name",
+        "receiver.email",
+        "receiver.phone",
+        "receiver.address",
+        "status",
+        "requestedAt",
+        "acceptedAt",
+        "createdAt",
+      ],
+    }).parse(foodRequests);
+
+    /* ================= RATINGS ================= */
+    const ratings = await Rating.find({
+      createdAt: { $gte: startDate, $lt: endDate },
+    })
       .populate("rater", "name")
       .populate("receiver", "name")
       .lean();
