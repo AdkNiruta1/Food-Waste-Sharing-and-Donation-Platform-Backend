@@ -431,20 +431,41 @@ export const deleteUser = async (req, res) => {
 // Get admin dashboard statistics
 export const getAdminStats = async (req, res) => {
   try {
-    // Get number of users
+    if (req.session.role !== "admin") {
+      return sendResponse(res, { status: 403, message: "Access denied" });
+    }
+
+    // Total users
     const totalUsers = await User.countDocuments();
-    const donors = await User.countDocuments({ role: "donor" });
-    const recipients = await User.countDocuments({ role: "recipient" });
-    const verifiedUsers = await User.countDocuments({ verified: true });
-    const pendingUsers = await User.countDocuments({ verified: false });
-    // Send response
+
+    // Total food posts
+    const totalFoodPosts = await FoodPost.countDocuments();
+
+    // Total food requests
+    const totalRequests = await FoodRequest.countDocuments();
+
+    // Average rating
+    const ratingStats = await Rating.aggregate([
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+        },
+      },
+    ]);
+
+    const averageRating =
+      ratingStats.length > 0
+        ? Number(ratingStats[0].averageRating.toFixed(2))
+        : 0;
+
     return sendResponse(res, {
+      status: 200,
       data: {
         totalUsers,
-        donors,
-        recipients,
-        verifiedUsers,
-        pendingUsers,
+        totalFoodPosts,
+        totalRequests,
+        averageRating,
       },
     });
   } catch (error) {
@@ -454,6 +475,7 @@ export const getAdminStats = async (req, res) => {
     });
   }
 };
+
 
 // Export users as CSV
 export const exportUsersCSV = async (req, res) => {
