@@ -1,5 +1,5 @@
 import multer from "multer";
-
+// Middleware to handle file uploads
 export const upload = multer({
   // Store files in memory as Buffer (required for processing with sharp or other tools)
   storage: multer.memoryStorage(),

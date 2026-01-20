@@ -66,7 +66,7 @@ export const createFoodDonation = async (req, res) => {
   }
 };
 
-// Get all food donations posted
+// Get all food donations posted for users which are available
 export const getAllFoodDonations = async (req, res) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -107,7 +107,7 @@ export const getAllFoodDonations = async (req, res) => {
 };
 
 
-// Get donations history by donor
+// Get donations history by donor with rating and accepted request
 
 export const getMyDonationsHistory = async (req, res) => {
   try {
@@ -159,7 +159,7 @@ export const getMyDonationsHistory = async (req, res) => {
   }
 };
 
-// get donations history by donor by id
+// get donations history details by donor by id
 
 export const getMyDonationsHistoryById = async (req, res) => {
   try {
@@ -347,7 +347,7 @@ export const requestFood = async (req, res) => {
   }
 };
 
-//accept food request
+//accept food request by donor
 export const acceptFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -438,7 +438,7 @@ export const acceptFoodRequest = async (req, res) => {
 };
 
 
-//complete food request
+//complete food request by donor
 export const completeFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -510,7 +510,7 @@ export const completeFoodRequest = async (req, res) => {
   }
 };
 
-//reject food request
+//reject food request by donor
 export const rejectedFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -533,6 +533,7 @@ export const rejectedFoodRequest = async (req, res) => {
 };
 
 // Get food locations
+// i think this is not required
 export const getFoodLocations = async (req, res) => {
   try {
     const { foodPostId } = req.params;
@@ -563,7 +564,7 @@ export const getFoodById = async (req, res) => {
   try {
     const food = await FoodPost.findById(req.params.id)
       .populate("donor")
-      .lean(); // 👈 required so we can attach extra data
+      .lean(); 
 
     if (!food) {
       return sendResponse(res, {
@@ -688,6 +689,7 @@ export const getFoodRequestDetails = async (req, res) => {
 };
 
 // Get all food requests
+// it think this is not required
 export const getListFoodRequests = async (req, res) => {
   try {
     const requests = await FoodRequest.find()
@@ -703,6 +705,7 @@ export const getListFoodRequests = async (req, res) => {
     return sendResponse(res, { status: 500, message: err.message });
   }
 };
+
 // get my food requests by receiver
 export const getMyFoodRequestsList = async (req, res) => {
   try {
@@ -738,7 +741,7 @@ export const getMyFoodRequestsList = async (req, res) => {
   }
 };
 
-// cancelled request by receiver
+// cancelled request by receiver to food post
 export const cancelFoodRequest = async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -756,3 +759,4 @@ export const cancelFoodRequest = async (req, res) => {
     return sendResponse(res, { status: 500, message: err.message });
   }
 };
+

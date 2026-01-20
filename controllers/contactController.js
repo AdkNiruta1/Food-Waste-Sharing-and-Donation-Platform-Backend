@@ -1,7 +1,7 @@
 import ContactMessage from "../models/ContactMessage.js";
 import { getPagination } from "../utils/pagination.js";
 import {sendResponse} from "../utils/responseHandler.js";
-
+// submit contact form
 export const submitContactForm = async (req, res) => {
   try {
     const {
@@ -49,7 +49,7 @@ export const submitContactForm = async (req, res) => {
     });
   }
 };
-
+// get all messages
 export const getContactMessages = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -79,6 +79,54 @@ export const getContactMessages = async (req, res) => {
         messages,
         pagination,
       },
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// chnage status to read
+export const markMessageRead = async (req, res) => {
+  try {
+    const messageId = req.params.id;
+    const message = await ContactMessage.findById(messageId);
+    if (!message) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Message not found",
+      });
+    }
+    message.status = "read";
+    await message.save();
+    return sendResponse(res, {
+      status: 200,
+      message: "Message marked as read",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+// delete message by admin 
+export const deleteMessage = async (req, res) => {
+  try {
+    const messageId = req.params.id;
+    const message = await ContactMessage.findById(messageId);
+    if (!message) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Message not found",
+      });
+    }
+    await ContactMessage.findByIdAndDelete(messageId);
+    return sendResponse(res, {
+      status: 200,
+      message: "Message deleted successfully",
     });
   } catch (error) {
     return sendResponse(res, {

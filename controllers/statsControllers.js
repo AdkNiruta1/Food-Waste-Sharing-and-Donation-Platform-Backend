@@ -2,6 +2,8 @@ import FoodRequest from "../models/FoodRequest.js";
 import Rating from "../models/RatingModel.js";
 import sendResponse from "../utils/responseHandler.js";
 
+
+//i think not used later i used 
 export const getReceiverStats = async (req, res) => {
   try {
     const receiverId = req.session.userId;

@@ -212,22 +212,22 @@ export const resubmitDocuments = async (req, res) => {
       .createHash("sha256")
       .update(req.params.token)
       .digest("hex");
-
+    // Find user
     const user = await User.findOne({
       resubmitToken: hashedToken,
       resubmitTokenExpires: { $gt: Date.now() },
     });
-
+    // Validate input
     if (!user) {
       return sendResponse(res, {
         status: 400,
         message: "Invalid or expired resubmission link",
       });
     }
-
+    // Get uploaded files
     const docs = req.files || {};
     const updatedDocs = {};
-
+    // Compress & save uploaded files
     for (const key of ["citizenship", "pan", "drivingLicense"]) {
       if (docs[key]) {
         const file = docs[key][0];
@@ -329,27 +329,29 @@ export const resubmitDocuments = async (req, res) => {
     });
   }
 };
-
+// UPDATE PHOTO
 export const updatePhoto = async (req, res) => {
   try {
     if (!req.session.userId) {
       return sendResponse(res, { status: 401, message: "Not logged in" });
     }
-
+    // Fetch user from database
     const user = await User.findById(req.session.userId);
     if (!user) return sendResponse(res, { status: 404, message: "User not found" });
-
+    // Validate input
     const docs = req.files || {};
     if (!docs.profilePicture) {
       return sendResponse(res, { status: 400, message: "No file uploaded" });
     }
-
+    // Compress & save uploaded file
     const file = docs.profilePicture[0];
     const folder = "uploads/profiles";
     const filename = `${Date.now()}-profile.jpg`;
-
+    // normalize path for frontend
     const savedPath = await saveCompressedImage(file.buffer, folder, filename);
+    // Update user
     user.profilePicture = savedPath.replace(/\\/g, "/");
+    // Save user
     await logActivity("Photo Updated", user._id, user._id);
     await user.save();
     return sendResponse(res, { status: 200, message: "Photo updated successfully", data: user.profilePicture });
@@ -359,7 +361,7 @@ export const updatePhoto = async (req, res) => {
 };
 
 
-// Vupdate profile
+// update profile
 export const updateMyProfile = async (req, res) => {
   try {
     // Check if user is logged in
@@ -371,24 +373,25 @@ export const updateMyProfile = async (req, res) => {
 
     // Allowed fields to update
     const allowedFields = ["name", "phone", "address", "bio"];
-
+    // Check if any valid fields were provided
     const updateData = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
     });
-
+    // Check if any valid fields were provided
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ status: 500, message: "No valid fields to update" });
     }
-
+    // Update user
     const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
       new: true,
       runValidators: true,
     });
+    // Log activity
     await logActivity("Profile updated", req.session.userId);
-
+    // Send response
     return res.status(200).json({
       message: "Profile updated successfully",
       data: updatedUser,
@@ -401,24 +404,25 @@ export const updateMyProfile = async (req, res) => {
     });
   }
 };
-
+// change password by user
 export const changePassword = async (req, res) => {
   try {
     if (!req.session.userId) {
       return sendResponse(res, { status: 401, message: "Not logged in" });
     }
-
+    // Fetch user from database
     const user = await User.findById(req.session.userId);
     if (!user) return sendResponse(res, { status: 404, message: "User not found" });
-
+    // Validate input
     const { oldPassword, newPassword } = req.body;
-
+    // Check if old password is correct
     const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if(oldPassword===newPassword){
+    if (oldPassword === newPassword) {
       return sendResponse(res, { status: 400, message: "New password cannot be same as old password" });
     }
+    // Check if old password is correct
     if (!isMatch) return sendResponse(res, { status: 400, message: "Old password is incorrect" });
-
+    // Hash new password
     user.password = await bcrypt.hash(newPassword, 10);
     await logActivity("Password changed", user._id, user._id);
     await user.save();
@@ -428,17 +432,17 @@ export const changePassword = async (req, res) => {
   }
 };
 
-
+// request email change
 export const requestEmailChange = async (req, res) => {
   try {
     if (!req.session.userId) {
       return sendResponse(res, { status: 401, message: "Not logged in" });
     }
-
+    // Check if user is logged in
     const user = await User.findById(req.session.userId);
     if (!user) return sendResponse(res, { status: 404, message: "User not found" });
 
-
+    // Check if email is provided
     const { email } = req.body;
     if (email == user.email) return sendResponse(res, { status: 400, message: "New email is same as current email" });
     //email already exists
@@ -475,15 +479,16 @@ export const requestEmailChange = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
+// verify otp for email changes
 export const verifyEmailChangeOTP = async (req, res) => {
   try {
     if (!req.session.userId) {
       return sendResponse(res, { status: 401, message: "Not logged in" });
     }
-
+    // check the otp
     const { otp, email } = req.body;
     if (!otp) return sendResponse(res, { status: 400, message: "OTP is required" });
-
+    // check the exit email
     const user = await User.findById(req.session.userId);
     if (!user) return sendResponse(res, { status: 404, message: "User not found" });
 

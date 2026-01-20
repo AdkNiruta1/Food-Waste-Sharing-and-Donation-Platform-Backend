@@ -505,7 +505,7 @@ export const exportUsersCSV = async (req, res) => {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
-
+//export full app report
 export const exportFullAppReport = async (req, res) => {
   try {
     /* ================= USERS ================= */
@@ -756,7 +756,7 @@ export const exportFullAppReportForMonth = async (req, res) => {
   }
 };
 
-// get the list of food post with request deatils and donor details
+// get the list of food post for dashboard
 export const getListFoodPost = async (req, res) => {
   try {
     const foodPosts = await foodPostModel
@@ -775,6 +775,7 @@ export const getListFoodPost = async (req, res) => {
     });
   }
 };
+// get the list of food post with request deatils and donor details and pagination , get all details to show in food post pages
 export const getFoodPostWithPagination = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -828,7 +829,8 @@ export const getFoodPostWithPagination = async (req, res) => {
 };
 
 
-// get the food post with request deatils and donor details
+// get the food post with request deatils and donor details by id
+// it think this is not required
 export const getFoodPost = async (req, res) => {
   try {
     const foodPost = await foodPostModel
@@ -848,7 +850,7 @@ export const getFoodPost = async (req, res) => {
     });
   }
 };
-//  get the donations over time
+//  get the donations over time for dashboard
 export const getDonationsOverTime = async (req, res) => {
   try {
     // last 7 days
@@ -911,7 +913,7 @@ export const getDonationsOverTime = async (req, res) => {
     });
   }
 };
-// get the food type distribution
+// get the food type distribution for dashboard
 export const getFoodTypeDistribution = async (req, res) => {
   try {
     const result = await foodPostModel.aggregate([
@@ -955,7 +957,7 @@ export const getFoodTypeDistribution = async (req, res) => {
   }
 };
 
-// Request Status Overview
+// Request Status Overview for dashboard
 export const getRequestStatusOverview = async (req, res) => {
   try {
     // Aggregate requests across all donors

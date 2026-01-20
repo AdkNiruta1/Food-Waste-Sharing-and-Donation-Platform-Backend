@@ -58,11 +58,15 @@ router.put(
   ]),
   resubmitDocuments
 );
-
+// UPDATE PROFILE
 router.put("/update-profile", protect, updateMyProfile);
+// UPDATE PHOTO
 router.put("/update-photo", upload.fields([{ name: "profilePicture" }]), updatePhoto);
+// CHANGE PASSWORD
 router.put("/update-password",protect, changePassword);
+// REQUEST EMAIL CHANGE
 router.post("/request-email-change",protect, requestEmailChange);
+// VERIFY EMAIL CHANGE
 router.post("/verify-email-otp",protect, verifyEmailChangeOTP);
 
 

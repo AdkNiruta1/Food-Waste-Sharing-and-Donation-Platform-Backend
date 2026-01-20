@@ -91,7 +91,7 @@ export const markNotificationRead = async (req, res) => {
     });
   }
 };
-
+// mark all notifications as read
 export const markAllNotificationsRead = async (req, res) => {
   try {
     // Ensure user is logged in
@@ -110,7 +110,7 @@ export const markAllNotificationsRead = async (req, res) => {
     });
   }
 };
-
+// delete notification
 export const deleteNotification = async (req, res) => {
   try {
     // Ensure user is logged in

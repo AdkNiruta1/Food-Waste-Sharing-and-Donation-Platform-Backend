@@ -8,11 +8,12 @@ import { adminRoutes as isAdmin, protect } from "../middleware/authMiddleware.js
 
 const router = express.Router();
 
-// Logged-in user
+// get looged of users or mine
 router.get("/my", protect, getMyLogs);
 
-// Admin
+// get all logs
 router.get("/", isAdmin, getLogs);
+// get user logs by admin from id
 router.get("/user/:userId", isAdmin, getUserLogs);
 
 export default router;

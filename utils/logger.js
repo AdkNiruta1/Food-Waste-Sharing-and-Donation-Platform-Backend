@@ -1,6 +1,6 @@
 // utils/logActivity.js
 import ActivityLog from "../models/ActivityLogModel.js";
-
+// Function to create an activity log
 export const logActivity = async (
   action,
   performedBy,

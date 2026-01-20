@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+// notificationsModel == table where save notifications
 const notificationSchema = new mongoose.Schema({
   message: String,
   user: {

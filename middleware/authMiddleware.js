@@ -1,5 +1,6 @@
 import User from "../models/userModel.js";
 import { sendResponse } from "../utils/responseHandler.js";
+//function to protect routes to prevent unauthorized access
 export const protect = async (req, res, next) => {
   // Check if user is logged in via session
   if (!req.session.userId) {
@@ -18,7 +19,7 @@ export const protect = async (req, res, next) => {
   // Allow access to the next middleware or route handler
   next();
 };
-
+//function to protect routes to prevent unauthorized access only for admin
 export const adminRoutes = async (req, res, next) => {
   // Check if user is logged in via session
   if (!req.session.userId) {
@@ -29,7 +30,7 @@ export const adminRoutes = async (req, res, next) => {
   }
 // Fetch user from database
   const user = await User.findById(req.session.userId);
-
+// Check if user is admin
   if (!user || user.role !== "admin") {
     return sendResponse(res, {
       status: 403,

@@ -32,7 +32,7 @@ router.get("/my",protect, getMyDonations);
 router.get("/active",protect, getMyActiveDonations);
 // Get my active donation by id
 router.get("/active/:requestId",protect, getMyActiveDonationById);
-// Request food donation
+// Request food donation by requester
 router.post("/request",protect, requestFood);
 // Accept food request
 router.post("/accept",protect, acceptFoodRequest);
@@ -42,7 +42,7 @@ router.post("/complete",protect, completeFoodRequest);
 router.get("/:foodPostId/locations",protect, getFoodLocations);
 // Reject food request
 router.post("/reject",protect, rejectedFoodRequest);
-// Get food by id
+// Get food post  by id
 router.get("/:id",protect, getFoodById);
 // Delete food donation
 router.delete("/:id",protect, deleteFoodDonation);

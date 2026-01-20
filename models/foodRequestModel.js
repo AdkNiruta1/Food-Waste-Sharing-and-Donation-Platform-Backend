@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+// foodRequestModel == table where save requests
 const foodRequestSchema = new mongoose.Schema({
   foodPost: { type: mongoose.Schema.Types.ObjectId, ref: "FoodPost", required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: "Users", required: true },

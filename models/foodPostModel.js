@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+// foodPostModel == table where save donations post
 const foodPostSchema = new mongoose.Schema(
   {
     donor: {

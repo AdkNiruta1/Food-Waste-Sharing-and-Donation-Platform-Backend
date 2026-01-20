@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+// ContactMessage model == table
 const contactMessageSchema = new mongoose.Schema(
   {
     name: {
@@ -34,7 +34,7 @@ const contactMessageSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "read", "resolved"],
+      enum: ["new", "read"],
       default: "new",
     },
   },

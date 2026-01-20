@@ -14,9 +14,11 @@ import mongoose from "mongoose";
 import cors from "cors";
 import http from "http";
 import { setupLiveLocationSocket } from "./controllers/liveLocationSocket.js";
-
+// Load environment variables
 dotenv.config();
+// Create Express app
 const app = express();
+// Create HTTP server
 const server = http.createServer(app);
 setupLiveLocationSocket(server);
 
@@ -56,17 +58,26 @@ app.use(
     },
   })
 );
+// Static files
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // Routes
+// routes for users
 app.use("/api/users", userRoutes);
+// routes for admin
 app.use("/api/admin", adminRoutes);
+//  routes for notifications
 app.use("/api/notifications", notificationRoutes);
+// routes for activity logs
 app.use("/api/activity-logs", activityLogRoutes);
+// routes for food donations
 app.use("/api/food-donations", foodDonationRoutes)
+// routes for ratings
 app.use("/api/ratings", ratingRoutes)
+// routes for contact
 app.use("/api/contact", contactRoutes)
 
 
 // Server
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
