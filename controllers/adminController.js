@@ -990,3 +990,34 @@ export const getRequestStatusOverview = async (req, res) => {
   }
 };
 
+// delete the food post by admin
+export const deleteFoodPost = async (req, res) => {
+  try {
+    const foodId = req.params.id;
+
+    // 1. Check if post exists
+    const foodPost = await foodPostModel.findById(foodId);
+    if (!foodPost) {
+      return sendResponse(res, {
+        status: 404,
+        message: "Food post not found",
+      });
+    }
+
+    // 2. Delete all requests related to this post
+    await foodRequestModel.deleteMany({ foodPost: foodId });
+
+    // 3. Delete the food post itself
+    await foodPostModel.findByIdAndDelete(foodId);
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Food post and related requests deleted successfully",
+    });
+  } catch (error) {
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
+  }
+};

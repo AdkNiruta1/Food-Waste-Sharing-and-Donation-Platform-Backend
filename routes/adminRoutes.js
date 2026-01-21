@@ -14,7 +14,8 @@ import {
   getDonationsOverTime,
   getFoodTypeDistribution,
   getRequestStatusOverview,
-  getFoodPostWithPagination
+  getFoodPostWithPagination,
+  deleteFoodPost
 } from "../controllers/adminController.js";
 import { adminRoutes, protect } from "../middleware/authMiddleware.js";
 
@@ -44,12 +45,12 @@ router.get("/food-post/:id/details", adminRoutes, getFoodPost);
 router.get("/food-post/list", adminRoutes, getListFoodPost);
 // get donations over time
 router.get("/donations-over-time", adminRoutes, getDonationsOverTime);
-
 // get food type distribution
 router.get("/food-type-distribution", adminRoutes, getFoodTypeDistribution);
-
 // get request status overview
 router.get("/request-status-overview", adminRoutes, getRequestStatusOverview);
 // get food post with pagination
 router.get("/food-post", adminRoutes, getFoodPostWithPagination);
+// delete food post
+router.delete("/food-post/:id", adminRoutes, deleteFoodPost);
 export default router;

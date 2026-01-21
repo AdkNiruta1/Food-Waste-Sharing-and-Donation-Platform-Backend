@@ -11,7 +11,6 @@ export const sendNotificationAll = async (message) => {
 // Get my notifications
 export const getMyNotifications = async (req, res) => {
   try {
-    // Check if user is logged in
     if (!req.session.userId) {
       return sendResponse(res, {
         status: 401,
@@ -19,38 +18,48 @@ export const getMyNotifications = async (req, res) => {
       });
     }
 
-    // Pagination parameters
+    const userId = req.session.userId;
+
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Fetch notifications for the logged-in user
-    const notifications = await Notification.find({
+    // ✅ COMMON FILTER (VERY IMPORTANT)
+    const filter = {
       $or: [
-        { user: req.session.userId }, // personal notifications
-        { user: { $exists: false } }  // global notifications
-      ]
-    })
+        { user: userId },              // personal
+        { user: { $exists: false } },  // global
+      ],
+    };
+
+    // 1️⃣ Paginated notifications
+    const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
+    // 2️⃣ Correct total count (same filter)
+    const total = await Notification.countDocuments(filter);
 
-    // Count total notifications for pagination
-    const total = await Notification.countDocuments({
-      user: req.session.userId,
-    });
+    // 3️⃣ Global seen / unseen counts (NOT paginated)
+    const [seenCount, unseenCount] = await Promise.all([
+      Notification.countDocuments({ ...filter, read: true }),
+      Notification.countDocuments({ ...filter, read: false }),
+    ]);
 
-    // Generate pagination metadata
     const pagination = getPagination(page, limit, total);
 
-    // Send response
     return sendResponse(res, {
-
       message: "Notifications fetched successfully",
       data: {
         notifications,
         pagination,
+        counts: {
+          total,
+          seen: seenCount,
+          unseen: unseenCount,
+        },
       },
     });
   } catch (error) {
@@ -60,6 +69,7 @@ export const getMyNotifications = async (req, res) => {
     });
   }
 };
+
 
 // MARK NOTIFICATION AS READ
 // PUT /api/notifications/mark-read/:id
