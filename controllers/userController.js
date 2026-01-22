@@ -4,10 +4,13 @@ import { sendResponse } from "../utils/responseHandler.js";
 import { saveCompressedImage } from "../utils/saveImage.js";
 import path from "path";
 import crypto from "crypto";
-
+import mongoose from "mongoose";
 import { logActivity } from "../utils/logger.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { createNotification } from "./notificationController.js";
+import foodPostModel from "../models/foodPostModel.js";
+import foodRequestModel from "../models/foodRequestModel.js";
+import Rating from "../models/RatingModel.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
@@ -511,5 +514,74 @@ export const verifyEmailChangeOTP = async (req, res) => {
     return sendResponse(res, { status: 200, message: "Email changed successfully" });
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
+export const getDonorStats = async (req, res) => {
+  try {
+    const id = req.session.userId
+    const donorId = new mongoose.Types.ObjectId(id);
+    if (!donorId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not authenticated",
+      });
+    }
+
+    // 1️⃣ Total donations (all food posts by donor)
+    const totalDonations = await foodPostModel.countDocuments({
+      donor: donorId,
+    });
+
+    // 2️⃣ Total requests on donor's food posts
+    const donorPosts = await foodPostModel.find(
+      { donor: donorId },
+      { _id: 1 }
+    ).lean();
+
+    const postIds = donorPosts.map(p => p._id);
+
+    const totalRequests = await foodRequestModel.countDocuments({
+      foodPost: { $in: postIds },
+    });
+
+    // 3️⃣ Total completed donations
+    const totalCompletedDonations = await foodPostModel.countDocuments({
+      donor: donorId,
+      status: "completed",
+    });
+
+    // 4️⃣ Average rating + count
+    const ratingAgg = await Rating.aggregate([
+      { $match: { receiver: donorId } },
+      {
+        $group: {
+          _id: "$receiver",
+          avgRating: { $avg: "$rating" },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const avgRating = ratingAgg[0]?.avgRating || 0;
+    const ratingCount = ratingAgg[0]?.ratingCount || 0;
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Donor stats fetched successfully",
+      data: {
+        totalDonations,
+        totalRequests,
+        totalCompletedDonations,
+        avgRating: Number(avgRating.toFixed(2)),
+        ratingCount,
+      },
+    });
+  } catch (error) {
+    console.error("Donor stats error:", error);
+    return sendResponse(res, {
+      status: 500,
+      message: error.message,
+    });
   }
 };
