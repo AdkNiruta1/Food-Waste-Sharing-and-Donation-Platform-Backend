@@ -19,28 +19,76 @@ export const getAllUsers = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const { role, verified, search } = req.query;
-    const filter = {};
 
-    if (role) filter.role = role;
-    if (verified !== undefined) filter.verified = verified === "true";
+    const matchStage = {
+      role: { $ne: "admin" },
+    };
+
+    if (role) matchStage.role = role;
+    if (verified !== undefined) {
+      matchStage.accountVerified = verified === "true" ? "verified" : "pending";
+    }
 
     if (search) {
-      filter.$or = [
+      matchStage.$or = [
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
         { phone: { $regex: search, $options: "i" } },
       ];
     }
-    filter.role = { $ne: "admin" };
-    const users = await User.find(filter)
-      .select("-password")
-      .skip(skip)
-      .limit(limit)
-      .sort({ createdAt: -1 });
 
-    const total = await User.countDocuments(filter);
+    // 🔹 Aggregation
+    const users = await User.aggregate([
+      { $match: matchStage },
 
-    // ✅ Use pagination utility here
+      // 🔹 Requests count (recipient)
+      {
+        $lookup: {
+          from: "foodrequests",
+          localField: "_id",
+          foreignField: "receiver",
+          as: "requests",
+        },
+      },
+
+      // 🔹 Donations count (donor)
+      {
+        $lookup: {
+          from: "foodposts",
+          localField: "_id",
+          foreignField: "donor",
+          as: "donations",
+        },
+      },
+
+      // 🔹 Add counts
+      {
+        $addFields: {
+          requestCount: { $size: "$requests" },
+          donationCount: { $size: "$donations" },
+        },
+      },
+
+      // 🔹 Remove arrays (keep response small)
+      {
+        $project: {
+          password: 0,
+          requests: 0,
+          donations: 0,
+          otp: 0,
+          otpExpires: 0,
+        },
+      },
+
+      // 🔹 Sort + paginate
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]);
+
+    // 🔹 Total users count (without pagination)
+    const total = await User.countDocuments(matchStage);
+
     const pagination = getPagination(page, limit, total);
 
     return sendResponse(res, {
