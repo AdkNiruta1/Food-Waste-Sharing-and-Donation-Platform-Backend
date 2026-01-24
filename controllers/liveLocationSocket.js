@@ -2,14 +2,14 @@ import { WebSocketServer } from "ws";
 import FoodPost from "../models/foodPostModel.js";
 import User from "../models/userModel.js";
 
-// In-memory storage for live locations
-// { foodPostId: { receiverId, lat, lng, lastUpdated, donorId } }
+// foodPostId => { receiverId, lat, lng, lastUpdated, donorId }
 const liveLocations = {};
 
-// TTL for cleanup (ms)
+// ws => { userId, role, foodPostId }
+const clientsMap = new Map();
+
 const LOCATION_TTL = 10 * 60 * 1000; // 10 minutes
 
-// Cleanup function to remove expired locations
 setInterval(() => {
   const now = Date.now();
   for (const postId in liveLocations) {
@@ -17,38 +17,44 @@ setInterval(() => {
       delete liveLocations[postId];
     }
   }
-}, 60 * 1000); // run every 1 min
+}, 60 * 1000);
 
 export const setupLiveLocationSocket = (server) => {
   const wss = new WebSocketServer({ server });
 
-  // Map of clients to track who belongs to which food post
-  const clientsMap = new Map();
+  wss.on("connection", (ws) => {
+    console.log("WS client connected");
 
-  wss.on("connection", async (ws, req) => {
-    // You can implement session or token authentication
-    // Example: ws must send { userId, role, foodPostId } on first message
     ws.on("message", async (message) => {
       try {
         const data = JSON.parse(message);
-
         const { userId, role, foodPostId, lat, lng } = data;
 
-        // Validate user
-        const user = await User.findById(userId);
-        if (!user) return ws.send(JSON.stringify({ error: "Unauthorized" }));
-
-        // Validate food post
-        const foodPost = await FoodPost.findById(foodPostId);
-        if (!foodPost) return ws.send(JSON.stringify({ error: "Invalid food post" }));
-
-        if (role === "recipient") {
-          // Only allow receiver to send location
-          if (foodPost.requests.includes(userId) === false) {
-            return ws.send(JSON.stringify({ error: "You are not authorized for this post" }));
+        // FIRST MESSAGE = REGISTER CLIENT
+        if (!clientsMap.has(ws)) {
+          // Validate once
+          const user = await User.findById(userId);
+          if (!user) {
+            ws.send(JSON.stringify({ error: "Unauthorized" }));
+            return;
           }
 
-          // Save live location in memory
+          const foodPost = await FoodPost.findById(foodPostId);
+          if (!foodPost) {
+            ws.send(JSON.stringify({ error: "Invalid food post" }));
+            return;
+          }
+
+          clientsMap.set(ws, { userId, role, foodPostId });
+
+          ws.send(JSON.stringify({ type: "REGISTERED" }));
+          console.log(`Registered ${role}: ${userId} for post ${foodPostId}`);
+        }
+
+        // HANDLE RECIPIENT LIVE LOCATION
+        if (role === "recipient" && lat && lng) {
+          const foodPost = await FoodPost.findById(foodPostId);
+
           liveLocations[foodPostId] = {
             receiverId: userId,
             lat,
@@ -57,10 +63,18 @@ export const setupLiveLocationSocket = (server) => {
             donorId: foodPost.donor.toString(),
           };
 
-          // Broadcast to the donor only
+          // Broadcast to donor watching THIS foodPost
           wss.clients.forEach((client) => {
-            if (client.readyState === ws.OPEN && clientsMap.get(client) === foodPost.donor.toString()) {
+            const clientInfo = clientsMap.get(client);
+
+            if (
+              client.readyState === client.OPEN &&
+              clientInfo &&
+              clientInfo.role === "donor" &&
+              clientInfo.foodPostId === foodPostId
+            ) {
               client.send(JSON.stringify({
+                type: "LIVE_LOCATION",
                 foodPostId,
                 lat,
                 lng,
@@ -68,10 +82,8 @@ export const setupLiveLocationSocket = (server) => {
               }));
             }
           });
-        } else if (role === "donor") {
-          // Register this donor client to the foodPost room
-          clientsMap.set(ws, userId); // userId of donor
         }
+
       } catch (err) {
         console.error("WebSocket error:", err);
         ws.send(JSON.stringify({ error: "Invalid data format" }));
@@ -80,9 +92,10 @@ export const setupLiveLocationSocket = (server) => {
 
     ws.on("close", () => {
       clientsMap.delete(ws);
+      console.log("WS client disconnected");
     });
   });
 
-  console.log("Live Location WebSocket server running!");
+  console.log("✅ Live Location WebSocket server running!");
   return wss;
 };

@@ -32,7 +32,6 @@ const updateUserAverageRating = async (userId) => {
   }
 };
 
-
 // Create or update rating
 export const rateUser = async (req, res) => {
   try {
@@ -52,6 +51,9 @@ export const rateUser = async (req, res) => {
       existingRating.rating = rating;
       existingRating.comment = comment || existingRating.comment;
       await existingRating.save();
+      await updateUserAverageRating(receiverId);
+      await createNotification(receiverId, "You have a got updated rating");
+      await logActivity("Rating Updated to user", req.session.userId);
       return sendResponse(res, { message: "Rating updated", data: existingRating });
     }
 
@@ -61,15 +63,11 @@ export const rateUser = async (req, res) => {
       rating,
       comment,
     });
-    await createNotification(receiverId, "You have a new rating");
-    await logActivity("Rating Created", req.session.userId);
-
     await updateUserAverageRating(receiverId);
     if (newRating) {
       await createNotification(receiverId, "You have a new rating");
-      await logActivity("Rating Created", req.session.userId);
+      await logActivity("Rating Created ", req.session.userId);
     }
-
     return sendResponse(res, { message: "Rating submitted", data: newRating });
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
