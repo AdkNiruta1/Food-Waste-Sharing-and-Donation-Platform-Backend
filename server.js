@@ -12,15 +12,10 @@ import ratingRoutes from "./routes/ratingRoutes.js"
 import path from "path";
 import mongoose from "mongoose";
 import cors from "cors";
-import http from "http";
-import { setupLiveLocationSocket } from "./controllers/liveLocationSocket.js";
 // Load environment variables
 dotenv.config();
 // Create Express app
 const app = express();
-// Create HTTP server
-const server = http.createServer(app);
-setupLiveLocationSocket(server);
 
 // Connect to MongoDB
 mongoose
@@ -80,7 +75,8 @@ app.use("/api/contact", contactRoutes)
 // Server
 // Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`HTTP + WebSocket server running on port ${PORT}`);
+app.listen(PORT, () =>
+   {
+  console.log(`server running on port ${PORT}`);
 });
 

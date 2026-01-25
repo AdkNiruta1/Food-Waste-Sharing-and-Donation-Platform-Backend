@@ -3,7 +3,7 @@ import { sendResponse } from "../utils/responseHandler.js"; // your custom helpe
 import { saveCompressedImage } from "../utils/saveImage.js";
 import { logActivity } from "../utils/logger.js";
 import FoodRequest from "../models/foodRequestModel.js";
-import { createNotification, sendNotificationAll } from "./notificationController.js";
+import { createNotification } from "./notificationController.js";
 import mongoose from "mongoose";
 import Rating from "../models/RatingModel.js";
 // Create a new food donation
@@ -54,7 +54,6 @@ export const createFoodDonation = async (req, res) => {
       photo,
     });
     await createNotification(donation.donor, "Your food donation has been created successfully");
-    await sendNotificationAll("A new food donation has been created you can pick it up");
     await logActivity("Food Donation Created", req.session.userId);
     return sendResponse(res, {
       status: 201,

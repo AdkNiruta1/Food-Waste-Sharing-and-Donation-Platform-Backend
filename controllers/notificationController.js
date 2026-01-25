@@ -4,9 +4,6 @@ import { getPagination } from "../utils/pagination.js";
 export const createNotification = async (userId, message) => {
   await Notification.create({ user: userId, message });
 };
-export const sendNotificationAll = async (message) => {
-  await Notification.create({ message });
-}
 // GET /api/notifications/my
 // Get my notifications
 export const getMyNotifications = async (req, res) => {
@@ -104,12 +101,19 @@ export const markNotificationRead = async (req, res) => {
 // mark all notifications as read
 export const markAllNotificationsRead = async (req, res) => {
   try {
-    // Ensure user is logged in
+    const userId = req.session.userId;
+
     await Notification.updateMany(
-      { user: req.session.userId, read: false },
+      {
+        read: false,
+        $or: [
+          { user: userId },        // personal
+          { user: { $exists: false } } // admin broadcast
+        ]
+      },
       { read: true }
     );
-    // Send response
+
     return sendResponse(res, {
       message: "All notifications marked as read",
     });
@@ -120,6 +124,7 @@ export const markAllNotificationsRead = async (req, res) => {
     });
   }
 };
+
 // delete notification
 export const deleteNotification = async (req, res) => {
   try {
