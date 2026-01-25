@@ -530,6 +530,20 @@ export const rejectedFoodRequest = async (req, res) => {
     return sendResponse(res, { status: 500, message: err.message });
   }
 };
+// update the status of food post to expired
+export const expireFoodPost = async (req, res) => {
+  try {
+    const { foodPostId } = req.params;
+    const foodPost = await FoodPost.findById(foodPostId);
+    if (!foodPost) return sendResponse(res, { status: 404, message: "Food post not found" });
+    if (foodPost.status === "expired") return sendResponse(res, { status: 400, message: "Food post already expired" });
+    foodPost.status = "expired";
+    await foodPost.save();
+    return sendResponse(res, { status: 200, message: "Food post expired", data: foodPost });
+  } catch (err) {
+    return sendResponse(res, { status: 500, message: err.message });
+  }
+}
 
 // Get food locations
 // i think this is not required
