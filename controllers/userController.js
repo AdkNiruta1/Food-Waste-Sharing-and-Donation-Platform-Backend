@@ -7,10 +7,8 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { logActivity } from "../utils/logger.js";
 import { sendEmail } from "../utils/sendEmail.js";
-import { createNotification } from "./notificationController.js";
 import foodPostModel from "../models/foodPostModel.js";
 import foodRequestModel from "../models/foodRequestModel.js";
-import Rating from "../models/RatingModel.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
@@ -188,7 +186,6 @@ export const resetPassword = async (req, res) => {
     // Save updated user
     await user.save();
     // Log activity
-    await createNotification(user._id, "someone is trying to reset your password");
     await logActivity(
       "Password Reset",
       req.session.userId || user._id,
@@ -550,22 +547,6 @@ export const getDonorStats = async (req, res) => {
       donor: donorId,
       status: "completed",
     });
-
-    // 4️⃣ Average rating + count
-    const ratingAgg = await Rating.aggregate([
-      { $match: { receiver: donorId } },
-      {
-        $group: {
-          _id: "$receiver",
-          avgRating: { $avg: "$rating" },
-          ratingCount: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const avgRating = ratingAgg[0]?.avgRating || 0;
-    const ratingCount = ratingAgg[0]?.ratingCount || 0;
-
     return sendResponse(res, {
       status: 200,
       message: "Donor stats fetched successfully",
@@ -573,8 +554,6 @@ export const getDonorStats = async (req, res) => {
         totalDonations,
         totalRequests,
         totalCompletedDonations,
-        avgRating: Number(avgRating.toFixed(2)),
-        ratingCount,
       },
     });
   } catch (error) {

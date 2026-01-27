@@ -3,9 +3,7 @@ import { sendResponse } from "../utils/responseHandler.js"; // your custom helpe
 import { saveCompressedImage } from "../utils/saveImage.js";
 import { logActivity } from "../utils/logger.js";
 import FoodRequest from "../models/foodRequestModel.js";
-import { createNotification } from "./notificationController.js";
 import mongoose from "mongoose";
-import Rating from "../models/RatingModel.js";
 // Create a new food donation
 export const createFoodDonation = async (req, res) => {
   try {
@@ -53,7 +51,6 @@ export const createFoodDonation = async (req, res) => {
       pickupInstructions,
       photo,
     });
-    await createNotification(donation.donor, "Your food donation has been created successfully");
     await logActivity("Food Donation Created", req.session.userId);
     return sendResponse(res, {
       status: 201,
@@ -127,20 +124,9 @@ export const getMyDonationsHistory = async (req, res) => {
       foodPosts.map(async (post) => {
         const acceptedRequest = post.acceptedRequest;
 
-        let ratingDoc = null;
-        if (acceptedRequest?.receiver) {
-          ratingDoc = await Rating.findOne({
-            rater: acceptedRequest.receiver._id, // who gave rating
-            receiver: req.session.userId         // current donor
-          });
-        }
-
         return {
           ...post.toObject(),
           acceptedRequest: acceptedRequest ? acceptedRequest.toObject() : null,
-          rating: ratingDoc
-            ? { value: ratingDoc.rating, comment: ratingDoc.comment }
-            : null
         };
       })
     );
@@ -183,20 +169,12 @@ export const getMyDonationsHistoryById = async (req, res) => {
       foodPosts.map(async (post) => {
         const acceptedRequest = post.acceptedRequest;
 
-        let ratingDoc = null;
-        if (acceptedRequest?.receiver) {
-          ratingDoc = await Rating.findOne({
-            rater: acceptedRequest.receiver._id, // who gave rating
-            receiver: req.session.userId         // current donor
-          });
-        }
+       
 
         return {
           ...post.toObject(),
           acceptedRequest: acceptedRequest ? acceptedRequest.toObject() : null,
-          rating: ratingDoc
-            ? { value: ratingDoc.rating, comment: ratingDoc.comment }
-            : null
+         
         };
       })
     );
@@ -337,7 +315,6 @@ export const requestFood = async (req, res) => {
       receiver: req.session.userId,
     });
 
-    await createNotification(foodPost.donor, "You have a new food request");
     await logActivity("Food Request Created", req.session.userId);
     return sendResponse(res, { status: 201, message: "Request sent", data: request });
 
@@ -399,17 +376,6 @@ export const acceptFoodRequest = async (req, res) => {
     request.foodPost.status = "accepted"; // or "reserved"
     request.foodPost.acceptedRequest = request._id;
     await request.foodPost.save();
-
-    /* ---------------- NOTIFICATIONS ---------------- */
-    await createNotification(
-      request.receiver,
-      "Your food request has been accepted 🎉"
-    );
-
-    await createNotification(
-      request.foodPost.donor,
-      "You accepted a food request"
-    );
 
     /* ---------------- ACTIVITY LOGS ---------------- */
     await logActivity(
@@ -478,12 +444,7 @@ export const completeFoodRequest = async (req, res) => {
     request.foodPost.status = "completed";
     await request.foodPost.save();
 
-    /* 🔔 NOTIFICATIONS */
-    await createNotification(
-      request.receiver,
-      "Your food request has been completed 🍲"
-    );
-
+  
     /* 🧾 ACTIVITY LOGS */
     await logActivity(
       "Food Request Completed",
@@ -522,7 +483,6 @@ export const rejectedFoodRequest = async (req, res) => {
 
     request.foodPost.status = "available";
     await request.foodPost.save();
-    await createNotification(request.receiver, "Your food request has been rejected");
     await logActivity("your food request has been rejected", request.receiver);
     await logActivity("Food Request Rejected", req.session.userId);
     return sendResponse(res, { status: 200, message: "Request rejected", data: request });
@@ -764,7 +724,6 @@ export const cancelFoodRequest = async (req, res) => {
     await request.save();
     // request.foodPost.status = "available";
     // await request.foodPost.save();
-    await createNotification(request.receiver, "Your food request has been cancelled");
     await logActivity("your food request has been cancelled", request.receiver);
     await logActivity("Food Request Cancelled", req.session.userId);
     return sendResponse(res, { status: 200, message: "Request cancelled", data: request });

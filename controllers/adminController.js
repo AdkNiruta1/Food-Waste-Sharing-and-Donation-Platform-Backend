@@ -2,13 +2,11 @@ import User from "../models/userModel.js";
 import { sendResponse } from "../utils/responseHandler.js";
 import { getPagination } from "../utils/pagination.js";
 import { logActivity } from "../utils/logger.js";
-import { createNotification } from "./notificationController.js";
 import { Parser } from "json2csv";
 import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto";
 import foodPostModel from "../models/foodPostModel.js";
 import foodRequestModel from "../models/foodRequestModel.js";
-import Rating from "../models/RatingModel.js";
 import archiver from "archiver";
 // ADMIN CONTROLLER FUNCTIONS
 // Get all users with optional filters
@@ -153,7 +151,6 @@ export const verifyUser = async (req, res) => {
     user.accountVerified = "verified";
     await user.save();
     await logActivity("User Verified", req.session.userId, user._id);
-    await createNotification(user._id, "Your account has been verified by admin");
     await sendEmail({
       to: user.email,
       subject: "Account Verified Successfully | Annapurna Bhandar",
@@ -274,10 +271,6 @@ export const rejectUser = async (req, res) => {
     await user.save();
     // Send notification and log activity
     await logActivity("User Rejected", req.session.userId, user._id);
-    await createNotification(
-      user._id,
-      "Your documents were rejected. Please resubmit with valid documents."
-    );
     // Send rejection email with resubmit link
     const resubmitLink = `${process.env.CLIENT_URL}/resubmit-documents/${token}`;
 
@@ -404,7 +397,6 @@ export const deleteUser = async (req, res) => {
     }
     // Log activity
     await logActivity("User Deleted", req.session.userId, user._id);
-    await createNotification(user._id, "Your account has been deleted by admin");
     await sendEmail({
       to: user.email,
       subject: "Account Deleted | Annapurna Bhandar",
@@ -488,28 +480,13 @@ export const getAdminStats = async (req, res) => {
     // Total food requests
     const totalRequests = await foodRequestModel.countDocuments();
 
-    // Average rating
-    const ratingStats = await Rating.aggregate([
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-        },
-      },
-    ]);
-
-    const averageRating =
-      ratingStats.length > 0
-        ? Number(ratingStats[0].averageRating.toFixed(2))
-        : 0;
-
+    
     return sendResponse(res, {
       status: 200,
       data: {
         totalUsers,
         totalFoodPosts,
         totalRequests,
-        averageRating,
       },
     });
   } catch (error) {
@@ -634,23 +611,6 @@ export const exportFullAppReport = async (req, res) => {
       ],
     }).parse(foodRequests);
 
-    /* ================= RATINGS ================= */
-    const ratings = await Rating.find()
-      .populate("rater", "name")
-      .populate("receiver", "name")
-      .lean();
-
-    const ratingsCSV = new Parser({
-      fields: [
-        "_id",
-        "rater.name",
-        "receiver.name",
-        "rating",
-        "comment",
-        "createdAt",
-      ],
-    }).parse(ratings);
-
     /* ================= ZIP FILE ================= */
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
@@ -665,7 +625,6 @@ export const exportFullAppReport = async (req, res) => {
     archive.append(usersCSV, { name: "users.csv" });
     archive.append(foodPostsCSV, { name: "food-posts.csv" });
     archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-    archive.append(ratingsCSV, { name: "ratings.csv" });
 
     await archive.finalize();
   } catch (error) {
@@ -763,24 +722,6 @@ export const exportFullAppReportForMonth = async (req, res) => {
       ],
     }).parse(foodRequests);
 
-    /* ================= RATINGS ================= */
-    const ratings = await Rating.find({
-      createdAt: { $gte: startDate, $lt: endDate },
-    })
-      .populate("rater", "name")
-      .populate("receiver", "name")
-      .lean();
-
-    const ratingsCSV = new Parser({
-      fields: [
-        "_id",
-        "rater.name",
-        "receiver.name",
-        "rating",
-        "comment",
-        "createdAt",
-      ],
-    }).parse(ratings);
 
     /* ================= ZIP FILE ================= */
     res.setHeader("Content-Type", "application/zip");
@@ -796,7 +737,6 @@ export const exportFullAppReportForMonth = async (req, res) => {
     archive.append(usersCSV, { name: "users.csv" });
     archive.append(foodPostsCSV, { name: "food-posts.csv" });
     archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-    archive.append(ratingsCSV, { name: "ratings.csv" });
 
     await archive.finalize();
   } catch (error) {
