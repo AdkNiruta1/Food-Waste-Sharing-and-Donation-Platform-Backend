@@ -1,6 +1,5 @@
 import cron from "node-cron";
 import FoodPost from "../models/foodPostModel.js";
-import Notification from "../models/NotificationsModel.js";
 
 // Runs every day at midnight
 cron.schedule("0 0 * * *", async () => {
@@ -23,17 +22,6 @@ cron.schedule("0 0 * * *", async () => {
     );
 
     // Send notification to donors
-    const notifications = expiredPosts.map(post => ({
-      user: post.donor._id,
-      message: `Your food post "${post.title}" has expired.`,
-      read: false,
-      isAdminBroadcast: false,
-    }));
-
-    if (notifications.length > 0) {
-      await Notification.insertMany(notifications);
-    }
-
     console.log(`Expired ${expiredPosts.length} food posts and notified donors.`);
 
   } catch (err) {

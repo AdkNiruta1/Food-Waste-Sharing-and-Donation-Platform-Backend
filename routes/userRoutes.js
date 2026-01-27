@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments, updateMyProfile,updatePhoto, changePassword,requestEmailChange,verifyEmailChangeOTP,getDonorStats} from "../controllers/userController.js";
+import { registerUser, loginUser, logoutUser,getMe, resetPassword,resubmitDocuments, updateMyProfile,updatePhoto,getDonorStats} from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/upload.js";
 import { verifyOtp, sendOtp as resendOtp } from "../controllers/otpController.js";
@@ -62,12 +62,6 @@ router.put(
 router.put("/update-profile", protect, updateMyProfile);
 // UPDATE PHOTO
 router.put("/update-photo", upload.fields([{ name: "profilePicture" }]), updatePhoto);
-// CHANGE PASSWORD
-router.put("/update-password",protect, changePassword);
-// REQUEST EMAIL CHANGE
-router.post("/request-email-change",protect, requestEmailChange);
-// VERIFY EMAIL CHANGE
-router.post("/verify-email-otp",protect, verifyEmailChangeOTP);
 // GET DONOR STATS
 router.get("/donor-stats",protect, getDonorStats);
 

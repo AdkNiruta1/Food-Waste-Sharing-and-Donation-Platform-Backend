@@ -15,18 +15,18 @@ export const getAllUsers = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-
+// Optional filters
     const { role, verified, search } = req.query;
-
+// Match stage
     const matchStage = {
       role: { $ne: "admin" },
     };
-
+    // Apply filters
     if (role) matchStage.role = role;
     if (verified !== undefined) {
       matchStage.accountVerified = verified === "true" ? "verified" : "pending";
     }
-
+    // Apply search
     if (search) {
       matchStage.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -86,9 +86,9 @@ export const getAllUsers = async (req, res) => {
 
     // 🔹 Total users count (without pagination)
     const total = await User.countDocuments(matchStage);
-
+    // 🔹 Pagination
     const pagination = getPagination(page, limit, total);
-
+    // Send response
     return sendResponse(res, {
       message: "Users fetched successfully",
       data: {
@@ -110,6 +110,7 @@ export const getAllUsers = async (req, res) => {
 // Get user details by ID
 export const getUserById = async (req, res) => {
   try {
+    // Find user
     const user = await User.findById(req.params.id).select("-password");
     // Check if user exists
     if (!user) {
@@ -131,14 +132,11 @@ export const getUserById = async (req, res) => {
   }
 };
 
-/**
- * @desc    Verify user documents
- * @route   PUT /api/admin/verify-user/:id
- * @access  Admin
- */
+
 // Verify user documents by admin
 export const verifyUser = async (req, res) => {
   try {
+    // Find user
     const user = await User.findById(req.params.id);
     // Check if user exists
     if (!user) {
@@ -149,8 +147,11 @@ export const verifyUser = async (req, res) => {
     }
     // Update user verification status
     user.accountVerified = "verified";
+    // Save user
     await user.save();
+    // Send log activity
     await logActivity("User Verified", req.session.userId, user._id);
+    // Send verification email
     await sendEmail({
       to: user.email,
       subject: "Account Verified Successfully | Annapurna Bhandar",
@@ -242,6 +243,7 @@ export const verifyUser = async (req, res) => {
       message: "User verified successfully",
     });
   } catch (error) {
+    // Send error response
     return sendResponse(res, {
       status: 500,
       message: error.message,
@@ -250,9 +252,9 @@ export const verifyUser = async (req, res) => {
 };
 
 // Reject user documents by admin
-
 export const rejectUser = async (req, res) => {
   try {
+    // Find user
     const user = await User.findById(req.params.id);
     // Check if user exists
     if (!user) {
@@ -264,10 +266,15 @@ export const rejectUser = async (req, res) => {
 
     // Update user verification status
     user.accountVerified = "rejected";
+    // Save user
     user.rejectionReason = req.body.reason || "Not specified";
+    // Generate resubmit token
     const token = crypto.randomBytes(32).toString("hex");
+    // Save resubmit token
     user.resubmitToken = crypto.createHash("sha256").update(token).digest("hex");
+    // Set resubmit token expiration
     user.resubmitTokenExpires = Date.now() + 1000 * 60 * 60 * 24; // 24 hours
+    // Save user
     await user.save();
     // Send notification and log activity
     await logActivity("User Rejected", req.session.userId, user._id);
@@ -387,6 +394,7 @@ export const rejectUser = async (req, res) => {
 // Delete user by ID
 export const deleteUser = async (req, res) => {
   try {
+    // Find user
     const user = await User.findByIdAndDelete(req.params.id);
     // Check if user exists
     if (!user) {
@@ -397,6 +405,7 @@ export const deleteUser = async (req, res) => {
     }
     // Log activity
     await logActivity("User Deleted", req.session.userId, user._id);
+    // Send email
     await sendEmail({
       to: user.email,
       subject: "Account Deleted | Annapurna Bhandar",
@@ -480,7 +489,7 @@ export const getAdminStats = async (req, res) => {
     // Total food requests
     const totalRequests = await foodRequestModel.countDocuments();
 
-    
+    // Send response
     return sendResponse(res, {
       status: 200,
       data: {
@@ -501,6 +510,7 @@ export const getAdminStats = async (req, res) => {
 // Export users as CSV
 export const exportUsersCSV = async (req, res) => {
   try {
+    // Find all users
     const users = await User.find()
       .select(
         "name email phone role emailVerified accountVerified rating ratingCount createdAt"
@@ -518,10 +528,11 @@ export const exportUsersCSV = async (req, res) => {
       "ratingCount",
       "createdAt"
     ];
-
+    // Create CSV
     const parser = new Parser({ fields });
+    // Convert to CSV
     const csv = parser.parse(users);
-
+    // Send CSV
     res.header("Content-Type", "text/csv");
     res.attachment("users.csv");
     return res.send(csv);
@@ -533,7 +544,7 @@ export const exportUsersCSV = async (req, res) => {
 //export full app report
 export const exportFullAppReport = async (req, res) => {
   try {
-    /* ================= USERS ================= */
+    // Find all users
     const users = await User.find()
       .select("-password -otp -otpExpires")
       .lean();
@@ -553,8 +564,8 @@ export const exportFullAppReport = async (req, res) => {
         "ratingCount",
         "createdAt",
       ],
-    }).parse(users);
-
+    }).parse(users);  
+    //
     /* ================= FOOD POSTS ================= */
     const foodPosts = await foodPostModel.find()
       .populate("donor", "name email phone address ")
@@ -581,7 +592,7 @@ export const exportFullAppReport = async (req, res) => {
         "createdAt",
       ],
     }).parse(foodPosts);
-
+    // find all food requests
     /* ================= FOOD REQUESTS ================= */
     const foodRequests = await foodRequestModel.find()
       .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
@@ -610,22 +621,22 @@ export const exportFullAppReport = async (req, res) => {
         "createdAt",
       ],
     }).parse(foodRequests);
-
+    // 
     /* ================= ZIP FILE ================= */
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
       "Content-Disposition",
       "attachment; filename=full-app-report.zip"
     );
-
+    // Create archive
     const archive = archiver("zip", { zlib: { level: 9 } });
-
+    // Create stream
     archive.pipe(res);
-
+    // Add files
     archive.append(usersCSV, { name: "users.csv" });
     archive.append(foodPostsCSV, { name: "food-posts.csv" });
     archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-
+    // Finalize
     await archive.finalize();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
@@ -634,6 +645,7 @@ export const exportFullAppReport = async (req, res) => {
 // export full report csv for a month
 export const exportFullAppReportForMonth = async (req, res) => {
   try {
+    // Get month and year
     const { month, year } = req.params;
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 1);
@@ -644,7 +656,7 @@ export const exportFullAppReportForMonth = async (req, res) => {
     })
       .select("-password -otp -otpExpires")
       .lean();
-
+    // Create CSV
     const usersCSV = new Parser({
       fields: [
         "_id",
@@ -668,7 +680,7 @@ export const exportFullAppReportForMonth = async (req, res) => {
     })
       .populate("donor", "name email phone address")
       .lean();
-
+    // Create CSV
     const foodPostsCSV = new Parser({
       fields: [
         "_id",
@@ -729,15 +741,15 @@ export const exportFullAppReportForMonth = async (req, res) => {
       "Content-Disposition",
       "attachment; filename=full-app-report.zip"
     );
-
+    // Create archive
     const archive = archiver("zip", { zlib: { level: 9 } });
-
+    // Create stream
     archive.pipe(res);
-
+    // Add files
     archive.append(usersCSV, { name: "users.csv" });
     archive.append(foodPostsCSV, { name: "food-posts.csv" });
     archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-
+    // Finalize
     await archive.finalize();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
@@ -747,11 +759,12 @@ export const exportFullAppReportForMonth = async (req, res) => {
 // get the list of food post for dashboard
 export const getListFoodPost = async (req, res) => {
   try {
+    // Get all food posts
     const foodPosts = await foodPostModel
       .find()
       .populate("donor")
       .lean();
-
+    // Send response
     return sendResponse(res, {
       status: 200,
       data: foodPosts,
@@ -763,81 +776,8 @@ export const getListFoodPost = async (req, res) => {
     });
   }
 };
-// get the list of food post with request deatils and donor details and pagination , get all details to show in food post pages
-export const getFoodPostWithPagination = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const search = req.query.search || "";
-
-    // Build search query
-    const query = search
-      ? {
-          $or: [
-            { title: { $regex: search, $options: "i" } },
-            { description: { $regex: search, $options: "i" } },
-            { district: { $regex: search, $options: "i" } },
-            { city: { $regex: search, $options: "i" } },
-          ],
-        }
-      : {};
-
-    // Count total matching documents
-    const total = await foodPostModel.countDocuments(query);
-
-    // Fetch paginated food posts
-    const foodPosts = await foodPostModel
-      .find(query)
-      .populate("donor")
-      .populate({
-        path: "requests",
-        populate: { path: "receiver" },
-      })
-      .skip(skip)
-      .limit(limit)
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const pagination = getPagination(page, limit, total);
-
-    return sendResponse(res, {
-      status: 200,
-      data: {
-        foodPosts,
-        pagination,
-      },
-    });
-  } catch (error) {
-    return sendResponse(res, {
-      status: 500,
-      message: error.message,
-    });
-  }
-};
 
 
-// get the food post with request deatils and donor details by id
-// it think this is not required
-export const getFoodPost = async (req, res) => {
-  try {
-    const foodPost = await foodPostModel
-      .findById(req.params.id)
-      .populate("donor")
-      .populate("acceptedRequest", "receiver")
-      .lean();
-
-    return sendResponse(res, {
-      status: 200,
-      data: foodPost,
-    });
-  } catch (error) {
-    return sendResponse(res, {
-      status: 500,
-      message: error.message,
-    });
-  }
-};
 //  get the donations over time for dashboard
 export const getDonationsOverTime = async (req, res) => {
   try {
@@ -845,7 +785,7 @@ export const getDonationsOverTime = async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
-
+    // Get donations
     const donations = await foodPostModel.aggregate([
       {
         $match: {
@@ -888,7 +828,7 @@ export const getDonationsOverTime = async (req, res) => {
         donations: found ? found.donations : 0,
       };
     });
-
+    // Send response
     return sendResponse(res, {
       status: 200,
       data: result,
@@ -904,6 +844,7 @@ export const getDonationsOverTime = async (req, res) => {
 // get the food type distribution for dashboard
 export const getFoodTypeDistribution = async (req, res) => {
   try {
+    // Get food posts
     const result = await foodPostModel.aggregate([
       {
         $group: {
@@ -912,13 +853,13 @@ export const getFoodTypeDistribution = async (req, res) => {
         },
       },
     ]);
-
+    // find the count of cooked and other
     const cookedCount =
       result.find((r) => r._id === "cooked")?.count || 0;
-
+    // find the count of cooked and other
     const otherCount =
       result.find((r) => r._id === "other")?.count || 0;
-
+    // Calculate distribution
     const total = cookedCount + otherCount;
 
     // Avoid division by zero
@@ -932,7 +873,7 @@ export const getFoodTypeDistribution = async (req, res) => {
         value: total === 0 ? 0 : Math.round((otherCount / total) * 100),
       },
     ];
-
+    // Send response
     return sendResponse(res, {
       status: 200,
       data: distribution,
@@ -957,16 +898,18 @@ export const getRequestStatusOverview = async (req, res) => {
         },
       },
     ]);
-
+    // Prepare chart data
     const allStatuses = ["pending", "accepted", "completed", "rejected", "cancelled"];
+    // Prepare chart data
     const chartData = allStatuses.map((status) => {
       const found = statusCounts.find((s) => s._id === status);
+      // Uppercase first letter
       return {
         status: status.charAt(0).toUpperCase() + status.slice(1),
         count: found ? found.count : 0,
       };
     });
-
+    // Send response
     return sendResponse(res, {
       status: 200,
       message: "Admin request status overview fetched successfully",
@@ -978,34 +921,3 @@ export const getRequestStatusOverview = async (req, res) => {
   }
 };
 
-// delete the food post by admin
-export const deleteFoodPost = async (req, res) => {
-  try {
-    const foodId = req.params.id;
-
-    // 1. Check if post exists
-    const foodPost = await foodPostModel.findById(foodId);
-    if (!foodPost) {
-      return sendResponse(res, {
-        status: 404,
-        message: "Food post not found",
-      });
-    }
-
-    // 2. Delete all requests related to this post
-    await foodRequestModel.deleteMany({ foodPost: foodId });
-
-    // 3. Delete the food post itself
-    await foodPostModel.findByIdAndDelete(foodId);
-
-    return sendResponse(res, {
-      status: 200,
-      message: "Food post and related requests deleted successfully",
-    });
-  } catch (error) {
-    return sendResponse(res, {
-      status: 500,
-      message: error.message,
-    });
-  }
-};

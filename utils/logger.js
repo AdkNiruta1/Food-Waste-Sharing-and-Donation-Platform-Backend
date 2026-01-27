@@ -8,6 +8,7 @@ export const logActivity = async (
   metadata = {}
 ) => {
   try {
+    // Create a new activity log
     await ActivityLog.create({
       action,
       performedBy,
