@@ -2,12 +2,15 @@ import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import { sendResponse } from "../utils/responseHandler.js";
 import { saveCompressedImage } from "../utils/saveImage.js";
+import path from "path";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import { logActivity } from "../utils/logger.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { createNotification } from "./notificationController.js";
 import foodPostModel from "../models/foodPostModel.js";
 import foodRequestModel from "../models/foodRequestModel.js";
+import Rating from "../models/RatingModel.js";
 // REGISTER USER
 export const registerUser = async (req, res) => {
   try {
@@ -185,6 +188,7 @@ export const resetPassword = async (req, res) => {
     // Save updated user
     await user.save();
     // Log activity
+    await createNotification(user._id, "someone is trying to reset your password");
     await logActivity(
       "Password Reset",
       req.session.userId || user._id,
@@ -403,13 +407,120 @@ export const updateMyProfile = async (req, res) => {
     });
   }
 };
-// GET DONOR STATS
+// change password by user
+export const changePassword = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+    // Fetch user from database
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+    // Validate input
+    const { oldPassword, newPassword } = req.body;
+    // Check if old password is correct
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (oldPassword === newPassword) {
+      return sendResponse(res, { status: 400, message: "New password cannot be same as old password" });
+    }
+    // Check if old password is correct
+    if (!isMatch) return sendResponse(res, { status: 400, message: "Old password is incorrect" });
+    // Hash new password
+    user.password = await bcrypt.hash(newPassword, 10);
+    await logActivity("Password changed", user._id, user._id);
+    await user.save();
+    return sendResponse(res, { status: 200, message: "Password changed successfully" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
+// request email change
+export const requestEmailChange = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+    // Check if user is logged in
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+    // Check if email is provided
+    const { email } = req.body;
+    if (email == user.email) return sendResponse(res, { status: 400, message: "New email is same as current email" });
+    //email already exists
+    const existingUser = await User.findOne({ email: email });
+    if (existingUser) return sendResponse(res, { status: 400, message: "Email already exists" });
+    if (!email) return sendResponse(res, { status: 400, message: "Email is required" });
+
+    // Generate OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    // Save OTP in user record with expiration (5 mins)
+    user.otp = otp;
+    user.otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
+    await user.save();
+
+    // Send OTP via email
+    await sendEmail({
+      to: email,
+      subject: "Email Change OTP",
+      html: `
+    <div style="font-family: Arial, sans-serif;">
+      <h2>Email Change Verification</h2>
+      <p>Your OTP to change your email is:</p>
+      <h1 style="letter-spacing: 4px;">${otp}</h1>
+      <p>This OTP will expire in 5 minutes.</p>
+    </div>
+  `,
+    });
+
+
+    await logActivity("Requested email change", user._id, user._id);
+    return sendResponse(res, { status: 200, message: "OTP sent to new email" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+// verify otp for email changes
+export const verifyEmailChangeOTP = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, { status: 401, message: "Not logged in" });
+    }
+    // check the otp
+    const { otp, email } = req.body;
+    if (!otp) return sendResponse(res, { status: 400, message: "OTP is required" });
+    // check the exit email
+    const user = await User.findById(req.session.userId);
+    if (!user) return sendResponse(res, { status: 404, message: "User not found" });
+
+    // Check OTP validity
+    if (
+      user.otp !== otp ||
+      Date.now() > user.otpExpires
+    ) {
+      return sendResponse(res, { status: 400, message: "Invalid or expired OTP" });
+    }
+
+    // Update email
+    user.email = email;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    await logActivity("Email changed", user._id, user._id);
+
+    return sendResponse(res, { status: 200, message: "Email changed successfully" });
+  } catch (error) {
+    return sendResponse(res, { status: 500, message: error.message });
+  }
+};
+
 export const getDonorStats = async (req, res) => {
   try {
-    // get donor id
     const id = req.session.userId
     const donorId = new mongoose.Types.ObjectId(id);
-    // Check if user is authenticated
     if (!donorId) {
       return sendResponse(res, {
         status: 401,
@@ -429,7 +540,7 @@ export const getDonorStats = async (req, res) => {
     ).lean();
 
     const postIds = donorPosts.map(p => p._id);
-    // Fetch all requests for this food
+
     const totalRequests = await foodRequestModel.countDocuments({
       foodPost: { $in: postIds },
     });
@@ -439,7 +550,22 @@ export const getDonorStats = async (req, res) => {
       donor: donorId,
       status: "completed",
     });
-    // Send response
+
+    // 4️⃣ Average rating + count
+    const ratingAgg = await Rating.aggregate([
+      { $match: { receiver: donorId } },
+      {
+        $group: {
+          _id: "$receiver",
+          avgRating: { $avg: "$rating" },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const avgRating = ratingAgg[0]?.avgRating || 0;
+    const ratingCount = ratingAgg[0]?.ratingCount || 0;
+
     return sendResponse(res, {
       status: 200,
       message: "Donor stats fetched successfully",
@@ -447,6 +573,8 @@ export const getDonorStats = async (req, res) => {
         totalDonations,
         totalRequests,
         totalCompletedDonations,
+        avgRating: Number(avgRating.toFixed(2)),
+        ratingCount,
       },
     });
   } catch (error) {
