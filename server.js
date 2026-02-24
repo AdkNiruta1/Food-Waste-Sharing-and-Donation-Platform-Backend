@@ -4,8 +4,10 @@ import MongoStore from "connect-mongo";
 import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 import activityLogRoutes from "./routes/activityLogRoutes.js";
 import foodDonationRoutes from "./routes/foodDonationRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
 import path from "path";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -57,11 +59,14 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api/users", userRoutes);
 // routes for admin
 app.use("/api/admin", adminRoutes);
+//  routes for notifications
+app.use("/api/notifications", notificationRoutes);
 // routes for activity logs
 app.use("/api/activity-logs", activityLogRoutes);
 // routes for food donations
 app.use("/api/food-donations", foodDonationRoutes)
-
+// routes for contact
+app.use("/api/contact", contactRoutes)
 
 
 // Server
