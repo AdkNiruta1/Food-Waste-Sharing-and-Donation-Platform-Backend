@@ -17,7 +17,8 @@ router.post(
   "/register",
   upload.fields([
     { name: "profilePicture", maxCount: 1 },
-    { name: "citizenship", maxCount: 1 },
+    { name: "citizenshipFront", maxCount: 1 },
+    { name: "citizenshipBack", maxCount: 1 },
     { name: "pan", maxCount: 1 },
     { name: "drivingLicense", maxCount: 1 },
   ]),
@@ -52,7 +53,8 @@ router.put("/reset-password", resetPassword);
 router.put(
   "/resubmit-documents/:token",
   upload.fields([
-    { name: "citizenship" },
+    { name: "citizenshipFront" },
+    { name: "citizenshipBack" },
     { name: "pan" },
     { name: "drivingLicense" },
   ]),

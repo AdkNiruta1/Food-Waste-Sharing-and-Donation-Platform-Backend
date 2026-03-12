@@ -16,21 +16,31 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, phone, address } = req.body;
 
-    // Check required fields
     if (!name || !email || !password || !role || !phone || !address) {
       return sendResponse(res, { message: "All fields are required", status: 400 });
     }
 
-    // Get uploaded files
     const docs = req.files || {};
-    if (!docs.citizenship && !docs.pan && !docs.drivingLicense) {
+
+    // Citizenship requires BOTH front and back
+    const hasCitizenship = docs.citizenshipFront && docs.citizenshipBack;
+    const hasPan = !!docs.pan;
+    const hasDrivingLicense = !!docs.drivingLicense;
+
+    if (!hasCitizenship && !hasPan && !hasDrivingLicense) {
       return sendResponse(res, {
-        message: "At least one document image is required",
+        message: "At least one complete document is required (citizenship needs both front & back)",
         status: 400,
       });
     }
 
-    // Check if email already exists
+    if ((docs.citizenshipFront && !docs.citizenshipBack) || (!docs.citizenshipFront && docs.citizenshipBack)) {
+      return sendResponse(res, {
+        message: "Both front and back of citizenship are required",
+        status: 400,
+      });
+    }
+
     const exists = await User.findOne({ email });
     if (exists) {
       return sendResponse(res, { message: "User email already exists", status: 400 });
@@ -38,21 +48,17 @@ export const registerUser = async (req, res) => {
 
     const compressedDocs = {};
 
-    // Compress & save uploaded files
-    for (const key of ["citizenship", "pan", "drivingLicense", "profilePicture"]) {
+    for (const key of ["citizenshipFront", "citizenshipBack", "pan", "drivingLicense", "profilePicture"]) {
       if (docs[key]) {
         const file = docs[key][0];
         const folder = key === "profilePicture" ? "uploads/profiles" : "uploads/documents";
         const filename = `${Date.now()}-${key}.jpg`;
-
         compressedDocs[key] = await saveCompressedImage(file.buffer, folder, filename);
       }
     }
 
-    // Hash password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user in database
     const user = await User.create({
       name,
       email,
@@ -61,19 +67,16 @@ export const registerUser = async (req, res) => {
       phone,
       address,
       documents: {
-        citizenship: compressedDocs.citizenship || null,
+        citizenshipFront: compressedDocs.citizenshipFront || null,
+        citizenshipBack: compressedDocs.citizenshipBack || null,
         pan: compressedDocs.pan || null,
         drivingLicense: compressedDocs.drivingLicense || null,
       },
       profilePicture: compressedDocs.profilePicture || null,
     });
 
-    // Log activity and create notification
-    await logActivity("User Registered", user._id, user._id, {
-      role: user.role,
-    });
+    await logActivity("User Registered", user._id, user._id, { role: user.role });
 
-    // Send success response
     sendResponse(res, {
       message: "User registered successfully",
       data: {
@@ -229,21 +232,24 @@ export const resubmitDocuments = async (req, res) => {
     }
     // Get uploaded files
     const docs = req.files || {};
+        // If either citizenship side is uploaded, both must be present
+    const hasFront = !!docs.citizenshipFront;
+    const hasBack = !!docs.citizenshipBack;
+    if ((hasFront && !hasBack) || (!hasFront && hasBack)) {
+      return sendResponse(res, {
+        status: 400,
+        message: "Both front and back of citizenship are required",
+      });
+    }
     const updatedDocs = {};
     // Compress & save uploaded files
-    for (const key of ["citizenship", "pan", "drivingLicense"]) {
+    for (const key of ["citizenshipFront", "citizenshipBack", "pan", "drivingLicense"]) {
       if (docs[key]) {
         const file = docs[key][0];
         const folder = "uploads/documents";
         const filename = `${Date.now()}-${key}.jpg`;
 
-        const savedPath = await saveCompressedImage(
-          file.buffer,
-          folder,
-          filename
-        );
-
-        // normalize path for frontend
+        const savedPath = await saveCompressedImage(file.buffer, folder, filename);
         updatedDocs[key] = savedPath.replace(/\\/g, "/");
       }
     }

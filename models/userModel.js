@@ -31,7 +31,8 @@ const UserSchema = new mongoose.Schema({
     required: true,
   },
   documents: {
-    citizenship: { type: String, default: null },   // store file path or URL
+    citizenshipFront: { type: String, default: null },  // front side
+    citizenshipBack: { type: String, default: null },   // back side   // store file path or URL
     pan: { type: String, default: null },           // store file path or URL
     drivingLicense: { type: String, default: null } // store file path or URL
   },
