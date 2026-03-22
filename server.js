@@ -29,7 +29,7 @@ app.use(express.json());
 // CORS MUST BE HERE (BEFORE session & routes)
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://jazzy-paletas-db3442.netlify.app",
     credentials: true,
   })
 );
@@ -48,8 +48,8 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
       httpOnly: true,
-      secure: false, //  MUST be false in localhost
-      sameSite: "lax",
+      secure: true, //  true for production
+      sameSite: "none", // None for production
     },
   })
 );

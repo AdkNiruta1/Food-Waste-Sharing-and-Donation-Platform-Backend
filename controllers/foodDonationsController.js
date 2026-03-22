@@ -634,6 +634,7 @@ export const deleteFoodDonation = async (req, res) => {
 export const updateFoodDonation = async (req, res) => {
   try {
     const foodId = req.params.id;
+
     const foodPost = await FoodPost.findById(foodId);
     if (!foodPost) {
       return sendResponse(res, {
@@ -642,12 +643,31 @@ export const updateFoodDonation = async (req, res) => {
       });
     }
 
+    let updatedData = { ...req.body };
+
+    const docs = req.files || {};
+    if (docs.photo) {
+      const file = docs.photo[0];
+      const folder = "uploads/food";
+      const filename = `${Date.now()}-food.jpg`;
+
+      const savedPath = await saveCompressedImage(
+        file.buffer,
+        folder,
+        filename
+      );
+
+      updatedData.photo = savedPath.replace(/\\/g, "/");
+    }
+
     const updatedFoodPost = await FoodPost.findByIdAndUpdate(
       foodId,
-      req.body,
+      updatedData,
       { new: true }
     );
+
     await logActivity("Food Donation Updated", req.session.userId);
+
     return sendResponse(res, {
       message: "Food donation updated successfully",
       data: updatedFoodPost,
