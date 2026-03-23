@@ -18,10 +18,12 @@ dotenv.config();
 const app = express();
 
 // Connect to MongoDB
-mongoose
-  .connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Parse JSON
 app.use(express.json());
@@ -29,16 +31,19 @@ app.use(express.json());
 // CORS MUST BE HERE (BEFORE session & routes)
 app.use(
   cors({
-    origin: "https://jazzy-paletas-db3442.netlify.app",
+    origin: ["https://aannapurna.netlify.app","http://localhost:5173"],
     credentials: true,
   })
 );
 
 // ✅ SESSION AFTER CORS
+// Trust proxy (IMPORTANT for Render)
+app.set("trust proxy", 1);
+
 app.use(
   session({
     name: "sid",
-    secret: process.env.SESSION_SECRET, // MUST exist in .env
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
@@ -48,11 +53,14 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
       httpOnly: true,
-      secure: true, //  true for production
-      sameSite: "none", // None for production
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
+
+
+
 // Static files
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // Routes
@@ -71,7 +79,14 @@ app.use("/api/contact", contactRoutes)
 
 app.use("/api/ratings", ratingRoutes)
 
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
 
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
+});
 // Server
 // Start server
 const PORT = process.env.PORT || 5000;
