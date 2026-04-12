@@ -36,7 +36,6 @@ app.use(
   })
 );
 
-// ✅ SESSION AFTER CORS
 // Trust proxy (IMPORTANT for Render)
 app.set("trust proxy", 1);
 
