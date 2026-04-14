@@ -520,8 +520,6 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
-
-// Export users as CSV
 export const exportUsersCSV = async (req, res) => {
   try {
     const users = await User.find()
@@ -530,144 +528,399 @@ export const exportUsersCSV = async (req, res) => {
       )
       .lean();
 
-    const fields = [
-      "name",
-      "email",
-      "phone",
-      "role",
-      "emailVerified",
-      "accountVerified",
-      "rating",
-      "ratingCount",
-      "createdAt"
+    const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=users.pdf");
+    doc.pipe(res);
+
+    // ── Title ──────────────────────────────────────────────────
+    doc
+      .fontSize(16)
+      .font("Helvetica-Bold")
+      .text("Users Report", { align: "center" });
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#666666")
+      .text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
+    doc.moveDown(1);
+
+    // ── Table config ───────────────────────────────────────────
+    const columns = [
+      { label: "Name",             key: "name",            width: 90  },
+      { label: "Email",            key: "email",           width: 130 },
+      { label: "Phone",            key: "phone",           width: 80  },
+      { label: "Role",             key: "role",            width: 55  },
+      { label: "Email Verified",   key: "emailVerified",   width: 70  },
+      { label: "Acct Verified",    key: "accountVerified", width: 65  },
+      { label: "Rating",           key: "rating",          width: 45  },
+      { label: "Rating Count",     key: "ratingCount",     width: 65  },
+      { label: "Created At",       key: "createdAt",       width: 100 },
     ];
 
-    const parser = new Parser({ fields });
-    const csv = parser.parse(users);
+    const ROW_HEIGHT  = 20;
+    const HEADER_H    = 22;
+    const startX      = doc.page.margins.left;
+    let   y           = doc.y;
 
-    res.header("Content-Type", "text/csv");
-    res.attachment("users.csv");
-    return res.send(csv);
+    const drawRow = (rowData, isHeader = false) => {
+      // row background
+      doc
+        .rect(startX, y, columns.reduce((s, c) => s + c.width, 0), isHeader ? HEADER_H : ROW_HEIGHT)
+        .fill(isHeader ? "#2563EB" : rowData._alt ? "#F1F5F9" : "#FFFFFF");
 
+      doc
+        .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(isHeader ? 9 : 8)
+        .fillColor(isHeader ? "#FFFFFF" : "#1E293B");
+
+      let x = startX;
+      columns.forEach((col) => {
+        let value = isHeader ? col.label : rowData[col.key];
+
+        if (!isHeader) {
+          if (value === undefined || value === null) value = "—";
+          else if (typeof value === "boolean")       value = value ? "Yes" : "No";
+          else if (col.key === "createdAt")          value = new Date(value).toLocaleDateString();
+          else if (col.key === "rating")             value = Number(value).toFixed(1);
+          else                                       value = String(value);
+        }
+
+        doc.text(value, x + 4, y + (isHeader ? 7 : 6), {
+          width:    col.width - 8,
+          ellipsis: true,
+          lineBreak: false,
+        });
+
+        x += col.width;
+      });
+
+      // row border
+      doc
+        .rect(startX, y, columns.reduce((s, c) => s + c.width, 0), isHeader ? HEADER_H : ROW_HEIGHT)
+        .strokeColor("#CBD5E1")
+        .stroke();
+
+      y += isHeader ? HEADER_H : ROW_HEIGHT;
+    };
+
+    // ── Header row ─────────────────────────────────────────────
+    drawRow(null, true);
+
+    // ── Data rows ──────────────────────────────────────────────
+    users.forEach((user, i) => {
+      // new page if not enough space
+      if (y + ROW_HEIGHT > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage();
+        y = doc.page.margins.top;
+        drawRow(null, true);          // repeat header on new page
+      }
+
+      drawRow({ ...user, _alt: i % 2 !== 0 });
+    });
+
+    // ── Footer ─────────────────────────────────────────────────
+    doc
+      .moveDown(1)
+      .fontSize(8)
+      .fillColor("#94A3B8")
+      .text(`Total records: ${users.length}`, startX, y + 8);
+
+    doc.end();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
-//export full app report
+// ─────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────
+const fmt = {
+  bool: (v) => (v === true ? "Yes" : v === false ? "No" : "—"),
+  date: (v) => (v ? new Date(v).toLocaleDateString() : "—"),
+  str:  (v) => (v === undefined || v === null || v === "" ? "—" : String(v)),
+  num:  (v, decimals = 1) => (v === undefined || v === null ? "—" : Number(v).toFixed(decimals)),
+  nested: (obj, path) => {
+    const val = path.split(".").reduce((o, k) => o?.[k], obj);
+    return val === undefined || val === null ? "—" : String(val);
+  },
+};
+
+/**
+ * Draw a full-width table.
+ * @param {PDFDocument} doc
+ * @param {number}      startX
+ * @param {object[]}    columns  – [{ label, key, width, format? }]
+ * @param {object[]}    rows
+ * @param {{ y: number }} cursor – shared mutable y-position ref
+ */
+function drawTable(doc, startX, columns, rows, cursor) {
+  const ROW_H  = 18;
+  const HEAD_H = 22;
+  const totalW = columns.reduce((s, c) => s + c.width, 0);
+
+  const drawHeader = () => {
+    doc
+      .rect(startX, cursor.y, totalW, HEAD_H)
+      .fill("#1E40AF");
+
+    let x = startX;
+    doc.font("Helvetica-Bold").fontSize(8).fillColor("#FFFFFF");
+    columns.forEach((col) => {
+      doc.text(col.label, x + 4, cursor.y + 7, {
+        width: col.width - 8,
+        ellipsis: true,
+        lineBreak: false,
+      });
+      x += col.width;
+    });
+
+    doc.rect(startX, cursor.y, totalW, HEAD_H).strokeColor("#3B82F6").stroke();
+    cursor.y += HEAD_H;
+  };
+
+  const drawDataRow = (row, alt) => {
+    doc
+      .rect(startX, cursor.y, totalW, ROW_H)
+      .fill(alt ? "#F8FAFC" : "#FFFFFF");
+
+    let x = startX;
+    doc.font("Helvetica").fontSize(7.5).fillColor("#1E293B");
+    columns.forEach((col) => {
+      let val;
+      if (col.format) {
+        val = col.format(row);
+      } else if (col.key.includes(".")) {
+        val = fmt.nested(row, col.key);
+      } else {
+        val = fmt.str(row[col.key]);
+      }
+
+      doc.text(val, x + 4, cursor.y + 5, {
+        width: col.width - 8,
+        ellipsis: true,
+        lineBreak: false,
+      });
+      x += col.width;
+    });
+
+    doc.rect(startX, cursor.y, totalW, ROW_H).strokeColor("#E2E8F0").stroke();
+    cursor.y += ROW_H;
+  };
+
+  drawHeader();
+
+  rows.forEach((row, i) => {
+    const pageBottom = doc.page.height - doc.page.margins.bottom;
+    if (cursor.y + ROW_H > pageBottom) {
+      doc.addPage();
+      cursor.y = doc.page.margins.top;
+      drawHeader();
+    }
+    drawDataRow(row, i % 2 !== 0);
+  });
+}
+
+/**
+ * Draw a section title block with coloured bar.
+ */
+function drawSectionTitle(doc, title, subtitle, cursor) {
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  if (cursor.y + 50 > pageBottom) {
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+  }
+
+  const startX = doc.page.margins.left;
+  const width  = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+  doc.rect(startX, cursor.y, 4, 32).fill("#2563EB");
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .fillColor("#0F172A")
+    .text(title, startX + 12, cursor.y + 2);
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .fillColor("#64748B")
+    .text(subtitle, startX + 12, cursor.y + 18);
+
+  cursor.y += 42;
+
+  // thin divider
+  doc.rect(startX, cursor.y, width, 1).fill("#E2E8F0");
+  cursor.y += 8;
+}
+
+// ─────────────────────────────────────────────
+//  Main handler
+// ─────────────────────────────────────────────
 export const exportFullAppReport = async (req, res) => {
   try {
-    /* ================= USERS ================= */
-    const users = await User.find()
-      .select("-password -otp -otpExpires")
-      .lean();
+    /* ── Fetch data ─────────────────────────────────────────── */
+    const [users, foodPosts, foodRequests, ratings] = await Promise.all([
+      User.find().select("-password -otp -otpExpires").lean(),
+      foodPostModel.find().populate("donor", "name email phone address").lean(),
+      foodRequestModel
+        .find()
+        .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
+        .populate("receiver", "name email phone address")
+        .lean(),
+      Rating.find().populate("rater", "name").populate("receiver", "name").lean(),
+    ]);
 
-    const usersCSV = new Parser({
-      fields: [
-        "_id",
-        "name",
-        "email",
-        "phone",
-        "role",
-        "address",
-        "emailVerified",
-        "accountVerified",
-        "rejectionReason",
-        "rating",
-        "ratingCount",
-        "createdAt",
-      ],
-    }).parse(users);
+    /* ── Bootstrap PDF ──────────────────────────────────────── */
+    const doc = new PDFDocument({
+      margin: 30,
+      size: "A4",
+      layout: "landscape",
+      info: { Title: "Full App Report", Author: "System Export" },
+    });
 
-    /* ================= FOOD POSTS ================= */
-    const foodPosts = await foodPostModel.find()
-      .populate("donor", "name email phone address ")
-      .lean();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=full-app-report.pdf");
+    doc.pipe(res);
 
-    const foodPostsCSV = new Parser({
-      fields: [
-        "_id",
-        "title",
-        "description",
-        "type",
-        "quantity",
-        "unit",
-        "expiryDate",
-        "city",
-        "district",
-        "pickupInstructions",
-        "status",
-        "donor.name",
-        "donor.email",
-        "donor.phone",
-        "donor.address",
-        "acceptedRequest",
-        "createdAt",
-      ],
-    }).parse(foodPosts);
+    const startX  = doc.page.margins.left;
+    const pageW   = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const cursor  = { y: doc.page.margins.top };
 
-    /* ================= FOOD REQUESTS ================= */
-    const foodRequests = await foodRequestModel.find()
-      .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
-      .populate("receiver", "name email phone address")
-      .lean();
+    /* ── Cover / Summary ────────────────────────────────────── */
+    // main title
+    doc
+      .rect(startX, cursor.y, pageW, 50)
+      .fill("#1E3A8A");
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(20)
+      .fillColor("#FFFFFF")
+      .text("Full Application Report", startX + 16, cursor.y + 10, { width: pageW - 32 });
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#BFDBFE")
+      .text(`Exported on ${new Date().toLocaleString()}`, startX + 16, cursor.y + 34, { width: pageW - 32 });
+    cursor.y += 62;
 
-    const foodRequestsCSV = new Parser({
-      fields: [
-        "_id",
-        "foodPost.title",
-        "foodPost.description",
-        "foodPost.type",
-        "foodPost.quantity",
-        "foodPost.unit",
-        "foodPost.expiryDate",
-        "foodPost.city",
-        "foodPost.district",
-        "foodPost.pickupInstructions",
-        "receiver.name",
-        "receiver.email",
-        "receiver.phone",
-        "receiver.address",
-        "status",
-        "requestedAt",
-        "acceptedAt",
-        "createdAt",
-      ],
-    }).parse(foodRequests);
+    // summary cards  (4 boxes in a row)
+    const cardW   = (pageW - 30) / 4;
+    const cardH   = 48;
+    const summaryItems = [
+      { label: "Total Users",         value: users.length,       color: "#2563EB" },
+      { label: "Total Food Posts",    value: foodPosts.length,   color: "#16A34A" },
+      { label: "Total Food Requests", value: foodRequests.length,color: "#D97706" },
+      { label: "Total Ratings",       value: ratings.length,     color: "#7C3AED" },
+    ];
 
-    /* ================= RATINGS ================= */
-    const ratings = await Rating.find()
-      .populate("rater", "name")
-      .populate("receiver", "name")
-      .lean();
+    summaryItems.forEach((item, i) => {
+      const cx = startX + i * (cardW + 10);
+      doc.rect(cx, cursor.y, cardW, cardH).fill("#F8FAFC").stroke();
+      doc.rect(cx, cursor.y, 4, cardH).fill(item.color);
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(22)
+        .fillColor(item.color)
+        .text(String(item.value), cx + 12, cursor.y + 6, { width: cardW - 16 });
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#64748B")
+        .text(item.label, cx + 12, cursor.y + 32, { width: cardW - 16 });
+    });
+    cursor.y += cardH + 24;
 
-    const ratingsCSV = new Parser({
-      fields: [
-        "_id",
-        "rater.name",
-        "receiver.name",
-        "rating",
-        "comment",
-        "createdAt",
-      ],
-    }).parse(ratings);
+    /* ══════════════════════════════════════════
+       SECTION 1 – USERS
+    ══════════════════════════════════════════ */
+    drawSectionTitle(doc, "Users", `${users.length} records`, cursor);
 
-    /* ================= ZIP FILE ================= */
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=full-app-report.zip"
-    );
+    drawTable(doc, startX, [
+      { label: "Name",             key: "name",            width: 90  },
+      { label: "Email",            key: "email",           width: 130 },
+      { label: "Phone",            key: "phone",           width: 75  },
+      { label: "Role",             key: "role",            width: 50  },
+      { label: "Address",          key: "address",         width: 90  },
+      { label: "Email Verified",   key: "emailVerified",   width: 65,  format: (r) => fmt.bool(r.emailVerified)  },
+      { label: "Acct Verified",    key: "accountVerified", width: 65,  format: (r) => fmt.bool(r.accountVerified) },
+      { label: "Rating",           key: "rating",          width: 45,  format: (r) => fmt.num(r.rating)          },
+      { label: "Created At",       key: "createdAt",       width: 90,  format: (r) => fmt.date(r.createdAt)      },
+    ], users, cursor);
 
-    const archive = archiver("zip", { zlib: { level: 9 } });
+    /* ══════════════════════════════════════════
+       SECTION 2 – FOOD POSTS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Food Posts", `${foodPosts.length} records`, cursor);
 
-    archive.pipe(res);
+    drawTable(doc, startX, [
+      { label: "Title",        key: "title",                 width: 90  },
+      { label: "Type",         key: "type",                  width: 50  },
+      { label: "Quantity",     key: "quantity",              width: 50  },
+      { label: "Unit",         key: "unit",                  width: 40  },
+      { label: "City",         key: "city",                  width: 60  },
+      { label: "District",     key: "district",              width: 65  },
+      { label: "Status",       key: "status",                width: 60  },
+      { label: "Expiry",       key: "expiryDate",            width: 75,  format: (r) => fmt.date(r.expiryDate)   },
+      { label: "Donor",        key: "donor.name",            width: 80  },
+      { label: "Donor Email",  key: "donor.email",           width: 110 },
+      { label: "Created At",   key: "createdAt",             width: 90,  format: (r) => fmt.date(r.createdAt)   },
+    ], foodPosts, cursor);
 
-    archive.append(usersCSV, { name: "users.csv" });
-    archive.append(foodPostsCSV, { name: "food-posts.csv" });
-    archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-    archive.append(ratingsCSV, { name: "ratings.csv" });
+    /* ══════════════════════════════════════════
+       SECTION 3 – FOOD REQUESTS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Food Requests", `${foodRequests.length} records`, cursor);
 
-    await archive.finalize();
+    drawTable(doc, startX, [
+      { label: "Post Title",   key: "foodPost.title",        width: 100 },
+      { label: "Type",         key: "foodPost.type",         width: 50  },
+      { label: "Qty",          key: "foodPost.quantity",     width: 35  },
+      { label: "Unit",         key: "foodPost.unit",         width: 35  },
+      { label: "City",         key: "foodPost.city",         width: 60  },
+      { label: "District",     key: "foodPost.district",     width: 65  },
+      { label: "Receiver",     key: "receiver.name",         width: 80  },
+      { label: "Receiver Email", key: "receiver.email",      width: 110 },
+      { label: "Status",       key: "status",                width: 60  },
+      { label: "Requested At", key: "requestedAt",           width: 85,  format: (r) => fmt.date(r.requestedAt) },
+      { label: "Accepted At",  key: "acceptedAt",            width: 85,  format: (r) => fmt.date(r.acceptedAt)  },
+    ], foodRequests, cursor);
+
+    /* ══════════════════════════════════════════
+       SECTION 4 – RATINGS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Ratings", `${ratings.length} records`, cursor);
+
+    drawTable(doc, startX, [
+      { label: "Rater",      key: "rater.name",    width: 130 },
+      { label: "Receiver",   key: "receiver.name", width: 130 },
+      { label: "Rating",     key: "rating",        width: 60,  format: (r) => fmt.num(r.rating) },
+      { label: "Comment",    key: "comment",       width: 310 },
+      { label: "Created At", key: "createdAt",     width: 100, format: (r) => fmt.date(r.createdAt) },
+    ], ratings, cursor);
+
+    /* ── Page numbers ───────────────────────────────────────── */
+    const totalPages = doc.bufferedPageRange().count;
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(i);
+      doc
+        .font("Helvetica")
+        .fontSize(7)
+        .fillColor("#94A3B8")
+        .text(
+          `Page ${i + 1} of ${totalPages}`,
+          doc.page.margins.left,
+          doc.page.height - doc.page.margins.bottom + 8,
+          { align: "right", width: pageW }
+        );
+    }
+
+    doc.end();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
   }
@@ -677,133 +930,180 @@ export const exportFullAppReportForMonth = async (req, res) => {
   try {
     const { month, year } = req.params;
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 1);
+    const endDate   = new Date(year, month, 1);
 
-    /* ================= USERS ================= */
-    const users = await User.find({
-      createdAt: { $gte: startDate, $lt: endDate },
-    })
-      .select("-password -otp -otpExpires")
-      .lean();
+    const monthLabel = startDate.toLocaleString("default", { month: "long", year: "numeric" });
 
-    const usersCSV = new Parser({
-      fields: [
-        "_id",
-        "name",
-        "email",
-        "phone",
-        "role",
-        "address",
-        "emailVerified",
-        "accountVerified",
-        "rejectionReason",
-        "rating",
-        "ratingCount",
-        "createdAt",
-      ],
-    }).parse(users);
+    /* ── Fetch data (parallel) ──────────────────────────────── */
+    const [users, foodPosts, foodRequests, ratings] = await Promise.all([
+      User.find({ createdAt: { $gte: startDate, $lt: endDate } })
+        .select("-password -otp -otpExpires")
+        .lean(),
+      foodPostModel
+        .find({ createdAt: { $gte: startDate, $lt: endDate } })
+        .populate("donor", "name email phone address")
+        .lean(),
+      foodRequestModel
+        .find({ createdAt: { $gte: startDate, $lt: endDate } })
+        .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
+        .populate("receiver", "name email phone address")
+        .lean(),
+      Rating.find({ createdAt: { $gte: startDate, $lt: endDate } })
+        .populate("rater", "name")
+        .populate("receiver", "name")
+        .lean(),
+    ]);
 
-    /* ================= FOOD POSTS ================= */
-    const foodPosts = await foodPostModel.find({
-      createdAt: { $gte: startDate, $lt: endDate },
-    })
-      .populate("donor", "name email phone address")
-      .lean();
+    /* ── Bootstrap PDF ──────────────────────────────────────── */
+    const doc = new PDFDocument({
+      margin: 30,
+      size: "A4",
+      layout: "landscape",
+      bufferPages: true,
+      info: {
+        Title:  `Monthly Report – ${monthLabel}`,
+        Author: "System Export",
+      },
+    });
 
-    const foodPostsCSV = new Parser({
-      fields: [
-        "_id",
-        "title",
-        "description",
-        "type",
-        "quantity",
-        "unit",
-        "expiryDate",
-        "city",
-        "district",
-        "pickupInstructions",
-        "status",
-        "donor.name",
-        "donor.email",
-        "donor.phone",
-        "donor.address",
-        "acceptedRequest",
-        "createdAt",
-      ],
-    }).parse(foodPosts);
-
-    /* ================= FOOD REQUESTS ================= */
-    const foodRequests = await foodRequestModel.find({
-      createdAt: { $gte: startDate, $lt: endDate },
-    })
-      .populate("foodPost", "title description type quantity unit expiryDate city district pickupInstructions")
-      .populate("receiver", "name email phone address")
-      .lean();
-
-    const foodRequestsCSV = new Parser({
-      fields: [
-        "_id",
-        "foodPost.title",
-        "foodPost.description",
-        "foodPost.type",
-        "foodPost.quantity",
-        "foodPost.unit",
-        "foodPost.expiryDate",
-        "foodPost.city",
-        "foodPost.district",
-        "foodPost.pickupInstructions",
-        "receiver.name",
-        "receiver.email",
-        "receiver.phone",
-        "receiver.address",
-        "status",
-        "requestedAt",
-        "acceptedAt",
-        "createdAt",
-      ],
-    }).parse(foodRequests);
-
-    /* ================= RATINGS ================= */
-    const ratings = await Rating.find({
-      createdAt: { $gte: startDate, $lt: endDate },
-    })
-      .populate("rater", "name")
-      .populate("receiver", "name")
-      .lean();
-
-    const ratingsCSV = new Parser({
-      fields: [
-        "_id",
-        "rater.name",
-        "receiver.name",
-        "rating",
-        "comment",
-        "createdAt",
-      ],
-    }).parse(ratings);
-
-    /* ================= ZIP FILE ================= */
-    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      "attachment; filename=full-app-report.zip"
+      `attachment; filename=report-${year}-${String(month).padStart(2, "0")}.pdf`
     );
+    doc.pipe(res);
 
-    const archive = archiver("zip", { zlib: { level: 9 } });
+    const startX = doc.page.margins.left;
+    const pageW  = doc.page.width  - doc.page.margins.left - doc.page.margins.right;
+    const cursor = { y: doc.page.margins.top };
 
-    archive.pipe(res);
+    /* ── Cover / Summary ────────────────────────────────────── */
+    // title band
+    doc.rect(startX, cursor.y, pageW, 56).fill("#1E3A8A");
+    doc
+      .font("Helvetica-Bold").fontSize(20).fillColor("#FFFFFF")
+      .text("Monthly Application Report", startX + 16, cursor.y + 8, { width: pageW - 32 });
+    doc
+      .font("Helvetica-Bold").fontSize(13).fillColor("#93C5FD")
+      .text(monthLabel, startX + 16, cursor.y + 30, { width: pageW - 32 });
+    doc
+      .font("Helvetica").fontSize(8).fillColor("#BFDBFE")
+      .text(
+        `Period: ${startDate.toLocaleDateString()} – ${new Date(endDate - 1).toLocaleDateString()}   |   Exported: ${new Date().toLocaleString()}`,
+        startX + 16, cursor.y + 46, { width: pageW - 32 }
+      );
+    cursor.y += 68;
 
-    archive.append(usersCSV, { name: "users.csv" });
-    archive.append(foodPostsCSV, { name: "food-posts.csv" });
-    archive.append(foodRequestsCSV, { name: "food-requests.csv" });
-    archive.append(ratingsCSV, { name: "ratings.csv" });
+    // summary cards
+    const cardW = (pageW - 30) / 4;
+    const cardH = 48;
+    [
+      { label: "Users Registered",    value: users.length,        color: "#2563EB" },
+      { label: "Food Posts Created",  value: foodPosts.length,    color: "#16A34A" },
+      { label: "Food Requests Made",  value: foodRequests.length, color: "#D97706" },
+      { label: "Ratings Given",       value: ratings.length,      color: "#7C3AED" },
+    ].forEach((item, i) => {
+      const cx = startX + i * (cardW + 10);
+      doc.rect(cx, cursor.y, cardW, cardH).fill("#F8FAFC").stroke();
+      doc.rect(cx, cursor.y, 4, cardH).fill(item.color);
+      doc
+        .font("Helvetica-Bold").fontSize(22).fillColor(item.color)
+        .text(String(item.value), cx + 12, cursor.y + 6, { width: cardW - 16 });
+      doc
+        .font("Helvetica").fontSize(8).fillColor("#64748B")
+        .text(item.label, cx + 12, cursor.y + 32, { width: cardW - 16 });
+    });
+    cursor.y += cardH + 24;
 
-    await archive.finalize();
+    /* ══════════════════════════════════════════
+       SECTION 1 – USERS
+    ══════════════════════════════════════════ */
+    drawSectionTitle(doc, "Users", `${users.length} records for ${monthLabel}`, cursor);
+    drawTable(doc, startX, [
+      { label: "Name",           key: "name",            width: 95  },
+      { label: "Email",          key: "email",           width: 135 },
+      { label: "Phone",          key: "phone",           width: 75  },
+      { label: "Role",           key: "role",            width: 55  },
+      { label: "Address",        key: "address",         width: 90  },
+      { label: "Email Verified", key: "emailVerified",   width: 65,  format: (r) => fmt.bool(r.emailVerified)   },
+      { label: "Acct Verified",  key: "accountVerified", width: 65,  format: (r) => fmt.bool(r.accountVerified) },
+      { label: "Rating",         key: "rating",          width: 45,  format: (r) => fmt.num(r.rating)           },
+      { label: "Created At",     key: "createdAt",       width: 95,  format: (r) => fmt.date(r.createdAt)       },
+    ], users, cursor);
+
+    /* ══════════════════════════════════════════
+       SECTION 2 – FOOD POSTS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Food Posts", `${foodPosts.length} records for ${monthLabel}`, cursor);
+    drawTable(doc, startX, [
+      { label: "Title",        key: "title",         width: 95  },
+      { label: "Type",         key: "type",          width: 50  },
+      { label: "Quantity",     key: "quantity",      width: 50  },
+      { label: "Unit",         key: "unit",          width: 40  },
+      { label: "City",         key: "city",          width: 65  },
+      { label: "District",     key: "district",      width: 65  },
+      { label: "Status",       key: "status",        width: 60  },
+      { label: "Expiry",       key: "expiryDate",    width: 80,  format: (r) => fmt.date(r.expiryDate) },
+      { label: "Donor",        key: "donor.name",    width: 85  },
+      { label: "Donor Email",  key: "donor.email",   width: 110 },
+      { label: "Created At",   key: "createdAt",     width: 80,  format: (r) => fmt.date(r.createdAt)  },
+    ], foodPosts, cursor);
+
+    /* ══════════════════════════════════════════
+       SECTION 3 – FOOD REQUESTS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Food Requests", `${foodRequests.length} records for ${monthLabel}`, cursor);
+    drawTable(doc, startX, [
+      { label: "Post Title",     key: "foodPost.title",    width: 105 },
+      { label: "Type",           key: "foodPost.type",     width: 50  },
+      { label: "Qty",            key: "foodPost.quantity", width: 35  },
+      { label: "Unit",           key: "foodPost.unit",     width: 35  },
+      { label: "City",           key: "foodPost.city",     width: 60  },
+      { label: "District",       key: "foodPost.district", width: 65  },
+      { label: "Receiver",       key: "receiver.name",     width: 85  },
+      { label: "Receiver Email", key: "receiver.email",    width: 115 },
+      { label: "Status",         key: "status",            width: 60  },
+      { label: "Requested At",   key: "requestedAt",       width: 80,  format: (r) => fmt.date(r.requestedAt) },
+      { label: "Accepted At",    key: "acceptedAt",        width: 80,  format: (r) => fmt.date(r.acceptedAt)  },
+    ], foodRequests, cursor);
+
+    /* ══════════════════════════════════════════
+       SECTION 4 – RATINGS
+    ══════════════════════════════════════════ */
+    doc.addPage();
+    cursor.y = doc.page.margins.top;
+    drawSectionTitle(doc, "Ratings", `${ratings.length} records for ${monthLabel}`, cursor);
+    drawTable(doc, startX, [
+      { label: "Rater",      key: "rater.name",    width: 130 },
+      { label: "Receiver",   key: "receiver.name", width: 130 },
+      { label: "Rating",     key: "rating",        width: 60,  format: (r) => fmt.num(r.rating) },
+      { label: "Comment",    key: "comment",       width: 310 },
+      { label: "Created At", key: "createdAt",     width: 100, format: (r) => fmt.date(r.createdAt) },
+    ], ratings, cursor);
+
+    /* ── Page numbers ───────────────────────────────────────── */
+    const totalPages = doc.bufferedPageRange().count;
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(i);
+      doc
+        .font("Helvetica").fontSize(7).fillColor("#94A3B8")
+        .text(
+          `${monthLabel}  •  Page ${i + 1} of ${totalPages}`,
+          doc.page.margins.left,
+          doc.page.height - doc.page.margins.bottom + 8,
+          { align: "right", width: pageW }
+        );
+    }
+
+    doc.end();
   } catch (error) {
     return sendResponse(res, { status: 500, message: error.message });
   }
 };
-
 // get the list of food post for dashboard
 export const getListFoodPost = async (req, res) => {
   try {
