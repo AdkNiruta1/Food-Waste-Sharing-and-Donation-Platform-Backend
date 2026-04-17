@@ -10,6 +10,7 @@ import foodPostModel from "../models/foodPostModel.js";
 import foodRequestModel from "../models/foodRequestModel.js";
 import Rating from "../models/RatingModel.js";
 import archiver from "archiver";
+import PDFDocument from "pdfkit";
 // ADMIN CONTROLLER FUNCTIONS
 // Get all users with optional filters
 export const getAllUsers = async (req, res) => {
@@ -775,6 +776,7 @@ export const exportFullAppReport = async (req, res) => {
       margin: 30,
       size: "A4",
       layout: "landscape",
+      bufferPages: true,
       info: { Title: "Full App Report", Author: "System Export" },
     });
 
