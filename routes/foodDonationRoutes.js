@@ -12,7 +12,8 @@ import {
   getMyActiveDonations,
   getMyDonationsHistory,
   deleteFoodDonation,
-  updateFoodDonation,getFoodRequestDetails,getListFoodRequests,cancelFoodRequest,getMyFoodRequestsList,getMyActiveDonationById,getMyDonationsHistoryById
+  updateFoodDonation,getFoodRequestDetails,getListFoodRequests,cancelFoodRequest,getMyFoodRequestsList,getMyActiveDonationById,getMyDonationsHistoryById,
+  getMyFoodRequestsActiveList,getMyFoodRequestDashboardStats
 } from "../controllers/foodDonationsController.js";
 import { upload } from "../middleware/upload.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -54,8 +55,12 @@ router.get("/:id/requests-details",protect, getFoodRequestDetails);
 router.get("/requests/list",protect, getListFoodRequests);
 // Get my food requests
 router.get("/my/requests",protect, getMyFoodRequestsList);
+router.get("/my/requests/active",protect, getMyFoodRequestsActiveList);
 // Cancel food request
 router.post("/request/cancel",protect, cancelFoodRequest);
+
+// Get my food request dashboard stats
+router.get("/my/requests/stats",protect, getMyFoodRequestDashboardStats);
 
 
 

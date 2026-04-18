@@ -5,7 +5,9 @@ import { logActivity } from "../utils/logger.js";
 import FoodRequest from "../models/foodRequestModel.js";
 import { createNotification } from "./notificationController.js";
 import mongoose from "mongoose";
+import { getPagination } from "../utils/pagination.js";
 import Rating from "../models/RatingModel.js";
+import UsersModel from "../models/userModel.js";
 // Create a new food donation
 export const createFoodDonation = async (req, res) => {
   try {
@@ -219,25 +221,88 @@ export const getMyDonationsHistoryById = async (req, res) => {
 export const getMyActiveDonations = async (req, res) => {
   try {
     if (!req.session.userId) {
-      return sendResponse(res, { status: 401, message: "Not logged in" });
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
     }
 
-    const activeRequests = await FoodRequest.find({
-      status: "accepted",
-    })
-      .populate({
-        path: "foodPost",
-        match: { donor: req.session.userId },
-      })
-      .populate("receiver")
-      .sort({ updatedAt: -1 });
+    const userId = req.session.userId;
 
-    // remove null foodPosts (not belonging to this donor)
-    const filtered = activeRequests.filter(r => r.foodPost);
+    // ✅ pagination params
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // ✅ aggregate for correct filtering + pagination
+    const [results] = await FoodRequest.aggregate([
+      {
+        $match: { status: "accepted" },
+      },
+      {
+        $lookup: {
+          from: "foodposts", // collection name (IMPORTANT: lowercase plural)
+          localField: "foodPost",
+          foreignField: "_id",
+          as: "foodPost",
+        },
+      },
+      { $unwind: "$foodPost" },
+
+      // ✅ filter by donor inside DB
+      {
+        $match: {
+          "foodPost.donor": userId,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "receiver",
+          foreignField: "_id",
+          as: "receiver",
+        },
+      },
+      { $unwind: "$receiver" },
+
+      // ✅ sorting
+      { $sort: { updatedAt: -1 } },
+
+      // ✅ pagination + total count
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          totalCount: [
+            { $count: "count" },
+          ],
+        },
+      },
+    ]);
+
+    const data = results.data;
+    const total = results.totalCount[0]?.count || 0;
+
+    // ✅ pagination object
+    const pagination = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPrevPage: page > 1,
+    };
 
     return sendResponse(res, {
       status: 200,
-      data: filtered,
+      message: "Active donations fetched successfully",
+      data: {
+        donations: data,
+        pagination,
+      },
     });
   } catch (error) {
     return sendResponse(res, {
@@ -246,7 +311,6 @@ export const getMyActiveDonations = async (req, res) => {
     });
   }
 };
-
 // get my active donations by donor by id
 export const getMyActiveDonationById = async (req, res) => {
   try {
@@ -303,16 +367,39 @@ export const getMyDonations = async (req, res) => {
       });
     }
 
-    const donations = await FoodPost.find({
-      donor: req.session.userId,
+    const userId = req.session.userId;
+
+    // 👉 pagination params
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // 👉 common filter
+    const filter = {
+      donor: userId,
       status: "available",
-    })
-      .sort({ createdAt: -1 });
+    };
+
+    // 👉 get paginated data
+    const donations = await FoodPost.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // 👉 total count
+    const total = await FoodPost.countDocuments(filter);
+
+    // 👉 pagination info
+    const pagination = getPagination(page, limit, total);
 
     return sendResponse(res, {
       status: 200,
       message: "Food donations fetched successfully",
-      data: donations,
+      data: {
+        donations,
+        pagination,
+      },
     });
   } catch (error) {
     return sendResponse(res, {
@@ -773,7 +860,129 @@ export const getMyFoodRequestsList = async (req, res) => {
     });
   }
 };
+export const getMyFoodRequestsActiveList = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
+    }
 
+    const userId = req.session.userId;
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { status } = req.query;
+
+    let filter = { receiver: userId };
+
+    if (status === "active") {
+      filter.status = { $in: ["pending", "accepted"] };
+    } else if (status === "history") {
+      filter.status = { $in: ["completed", "rejected", "cancelled"] };
+    }
+
+    const requests = await FoodRequest.find(filter)
+      .populate({
+        path: "foodPost",
+        populate: { path: "donor" },
+      })
+      .populate("receiver")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await FoodRequest.countDocuments(filter);
+
+    return sendResponse(res, {
+      status: 200,
+      message: "Food requests fetched successfully",
+      data: {
+        requests,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasNextPage: page < Math.ceil(total / limit),
+          hasPrevPage: page > 1,
+        },
+      },
+    });
+  } catch (err) {
+    return sendResponse(res, {
+      status: 500,
+      message: err.message,
+    });
+  }
+};
+export const getMyFoodRequestDashboardStats = async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return sendResponse(res, {
+        status: 401,
+        message: "Not logged in",
+      });
+    }
+
+    const userId = req.session.userId;
+
+    // 🔥 Get user (for rating)
+    const user = await UsersModel.findById(userId).lean();
+
+    // 🔥 Get requests
+    const requests = await FoodRequest.find({ receiver: userId }).lean();
+
+    // =========================
+    // ✅ COUNTS
+    // =========================
+    const totalRequests = requests.length;
+
+    const pendingRequests = requests.filter(r => r.status === "pending").length;
+    const acceptedRequests = requests.filter(r => r.status === "accepted").length;
+    const completedRequests = requests.filter(r => r.status === "completed").length;
+
+    const activeNow = pendingRequests + acceptedRequests;
+
+    // =========================
+    // ⭐ USER RATING (FIXED)
+    // =========================
+    const averageRating =
+      user?.ratingCount > 0
+        ? (user.rating / user.ratingCount).toFixed(1)
+        : 0;
+
+    // =========================
+    // 📦 RESPONSE
+    // =========================
+    return sendResponse(res, {
+      status: 200,
+      message: "Dashboard stats fetched successfully",
+      data: {
+        totalRequests,
+        pendingRequests,
+        acceptedRequests,
+        completedRequests,
+        activeNow,
+
+        // ⭐ correct rating
+        averageRating,
+        ratingCount: user?.ratingCount || 0,
+        rawRating: user?.rating || 0,
+      },
+    });
+
+  } catch (err) {
+    return sendResponse(res, {
+      status: 500,
+      message: err.message,
+    });
+  }
+};
 // cancelled request by receiver to food post
 export const cancelFoodRequest = async (req, res) => {
   try {
