@@ -32,16 +32,26 @@ app.use(cors({
 
 app.set("trust proxy", 1);
 
-app.use(session({
-  name: "sid",
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-  }),
-}));
-
+app.use(
+  session({
+    name: "sid",
+    secret: process.env.SESSION_SECRET, // MUST exist in .env
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: "sessions",
+    }),
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24,
+      httpOnly: true,
+      secure: false, //  MUST be false in localhost
+      sameSite: "lax",
+    },
+  })
+);
+// Static files
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
