@@ -12,6 +12,7 @@ import contactRoutes from "./routes/contactRoutes.js";
 import ratingRoutes from "./routes/ratingRoutes.js";
 import mongoose from "mongoose";
 import cors from "cors";
+import path from "path";
 
 dotenv.config();
 
