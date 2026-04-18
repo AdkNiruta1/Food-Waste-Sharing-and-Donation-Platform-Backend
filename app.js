@@ -18,9 +18,12 @@ dotenv.config();
 const app = express();
 
 // DB connection
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error(err));
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Middleware
 app.use(express.json());
@@ -35,7 +38,7 @@ app.set("trust proxy", 1);
 app.use(
   session({
     name: "sid",
-    secret: process.env.SESSION_SECRET, // MUST exist in .env
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
@@ -45,11 +48,12 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
       httpOnly: true,
-      secure: false, //  MUST be false in localhost
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
+
 // Static files
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // Routes
@@ -64,6 +68,11 @@ app.use("/api/ratings", ratingRoutes);
 // 404
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
 });
 
 export default app;
