@@ -221,88 +221,25 @@ export const getMyDonationsHistoryById = async (req, res) => {
 export const getMyActiveDonations = async (req, res) => {
   try {
     if (!req.session.userId) {
-      return sendResponse(res, {
-        status: 401,
-        message: "Not logged in",
-      });
+      return sendResponse(res, { status: 401, message: "Not logged in" });
     }
 
-    const userId = req.session.userId;
+    const activeRequests = await FoodRequest.find({
+      status: "accepted",
+    })
+      .populate({
+        path: "foodPost",
+        match: { donor: req.session.userId },
+      })
+      .populate("receiver")
+      .sort({ updatedAt: -1 });
 
-    // ✅ pagination params
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    // ✅ aggregate for correct filtering + pagination
-    const [results] = await FoodRequest.aggregate([
-      {
-        $match: { status: "accepted" },
-      },
-      {
-        $lookup: {
-          from: "foodposts", // collection name (IMPORTANT: lowercase plural)
-          localField: "foodPost",
-          foreignField: "_id",
-          as: "foodPost",
-        },
-      },
-      { $unwind: "$foodPost" },
-
-      // ✅ filter by donor inside DB
-      {
-        $match: {
-          "foodPost.donor": userId,
-        },
-      },
-
-      {
-        $lookup: {
-          from: "users",
-          localField: "receiver",
-          foreignField: "_id",
-          as: "receiver",
-        },
-      },
-      { $unwind: "$receiver" },
-
-      // ✅ sorting
-      { $sort: { updatedAt: -1 } },
-
-      // ✅ pagination + total count
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-          ],
-          totalCount: [
-            { $count: "count" },
-          ],
-        },
-      },
-    ]);
-
-    const data = results.data;
-    const total = results.totalCount[0]?.count || 0;
-
-    // ✅ pagination object
-    const pagination = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      hasNextPage: page < Math.ceil(total / limit),
-      hasPrevPage: page > 1,
-    };
+    // remove null foodPosts (not belonging to this donor)
+    const filtered = activeRequests.filter(r => r.foodPost);
 
     return sendResponse(res, {
       status: 200,
-      message: "Active donations fetched successfully",
-      data: {
-        donations: data,
-        pagination,
-      },
+      data: filtered,
     });
   } catch (error) {
     return sendResponse(res, {
@@ -311,6 +248,7 @@ export const getMyActiveDonations = async (req, res) => {
     });
   }
 };
+
 // get my active donations by donor by id
 export const getMyActiveDonationById = async (req, res) => {
   try {
